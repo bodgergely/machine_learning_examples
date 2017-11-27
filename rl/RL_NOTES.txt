@@ -1209,9 +1209,410 @@ Simpler version is to keep a count of every (s,a) pair seen so far => alpha(s,a)
                     alpha(s,a) = alpha_0/(k + m*count(s,a))  Each (s,a) will have its own decaying learning rate 
 _______________________________________________________________________________________________________________________________________________________
 
-#################
-Code: sarsa.py  #
-#################
+
+Code: sarsa.py  
+
+
+
+#######################################################################################################################################
+
+#######################################################################################################################################
+
+
+
+
+Q-learning 
+----------
+
+
+Deviates from the strategies we have been taking so far. 
+
+Main theme before: generalized policy iteration
+        
+        - evaluation of policy
+        - improvement of policy (choosing an action greedily based on the current value estimate)
+
+                    ||
+                    \/   they are called on-policy methods
+
+We have been studying so far on-policy methods. We are playing the game using the current best policy.
+                             ---------
+
+We always followed the current best policy.
+
+  -----------------------------------
+  | Q-learning is off-policy method |   ==> we can do any random action and still find Q* (optimal policy)
+  -----------------------------------
+
+
+Similar to SARSA. They look astonishingly similar. 
+
+Instead of choosing a' based on the argmax of Q we instead update Q based on the max over all actions.
+    We update Q(s,a) with max over Q(s',a')
+
+But Q-learning is off-policy:
+    - no need to do a' as next action ==> we use Q(s',a') when updating Q(s,a) even if we do not do a' as next move
+    - does not matter what policy we follow, we can choose actions randomly and still get optimal result
+
+    BUT: random actions -> suboptimal -> takes longer for episode to finish
+
+    ----------------------------------------
+    || DOES NOT MATTER WHAT POLICY WE USE ||
+    ----------------------------------------
+
+If the policy you use during Q-learning is a greedy policy - meaning always choose the argmax over Q then Q(s',a') will correspond to the next action you will take.
+So in that case it will be also SARSA.
+
+---------------------
+Code: q_learning.py |
+---------------------
+
+
+Temporal Difference Summary:
+----------------------------
+
+    - Combines aspects of MC and DP
+        - MC: learn from experience/play the game
+    - Idea of taking sample mean of returns: multi-armed bandit
+    - MC is not fully online
+    - DP: bootstrapping, recursive form of value function to estimate the return
+                    ||
+                    \/
+
+                   TD(0) combines these ideas. 
+
+    Instead of taking sample mean of returns - we take sample mean of estimated returns which is based on the current reward r and the next state value V(s')
+
+
+    Control problem: we need to use the action-value function (Q(s,a)) instead of the state-value function (V(s))
+
+    - ON-POLICY:  SARSA     --> value iteration and TD(0)  - every algo so far has been on-policy
+    - OFF-POLICY: Q-learning   -> popular due to deep Q-learning
+
+    Disadvantages:
+    --------------
+        - Need for Q(s,a)
+        - state space can become infeasible to enumerate, and we also need to enumarate every action for every state
+        - Q may not even fit into memory due to the above state/action spaces
+        - Measuring Q(s,a) for all s, a is called the tabular method
+                        
+            #########################################################################################################################################
+
+                Storing all Q elements is impossible most of the time!!! We need approximation methods to compress the space requirements of Q      #
+                                                                                 ---------------------
+                        SOLUTION: FUNCTION APPROXIMATION of Q(s,a)
+
+##########################################################################################################################################
+                    
+
+####################################################################################################################
+####################################################################################################################
+####################################################################################################################
+
+
+
+Section 8
+
+
+Approximation methods
+---------------------
+
+Major problem with the methods so far that each require us to estimate the V(s) for each state s
+
+V(s) -   need to estimate |S| values
+Q(s,a) - need to estimate |S|x|A| values
+|S| and |A| can be very large
+
+
+Solution: Approximation
+          -------------
+
+Neural networks are universal function approximators.
+---------------
+
+  - Step 1: feature extraction, convert state s to feature vector x,   x = phi(s)
+  - Step 2: we want a function f(x, theta) === V(s)         # === means approximate, theta - set of parameters
+                                                            # estimates V(S) - value function
+
+Given the right architecure a neural network can approximate any fuction to a given accuracy.
+They do not perform perfectly but very well.
+
+
+
+Linear approximation
+--------------------
+
+    - differentiable models are required
+    - linear regression
+    - gradien descent
+
+
+Linear models:
+    - supervised learning aka function approximation
+    - we are tryingn to approximate V(s) or Q(s,a)
+
+    - Rewards are real numbers
+    - Returns(sums of rewards) are real numbers
+    - Value functions are expected returns -> are real numbers
+    
+    2 supervised learning techniques:
+        - classification
+        - regression
+        
+    We are doing regression.
+                 ----------
+
+Supervised learning methods have cost functions  -> the ERROR
+                                 --------------
+    Regression cost function: squared error, squared diff between V and estimate of V
+                            Error = ( V(s) - V_est(s) ) ** 2
+
+                            Error = [ E[G(t)|S_t=s] - V_est(s) ] ** 2
+
+              Replace V with its definition. But we do not know this expected value.
+    As we learned from MC we can replace it with its sample mean.
+                
+                            Error = [ 1/N * sum(G(i,s) for i in N) - V_est(s) ] ** 2
+
+  We can also treat each G(i,s) as a training sample. Then try to minimize all the individual squared diff's simultaneously.
+
+                            Error = sum( (G(i,s) - V_est(s)**2 )  for i in range(N))
+                            
+                            Error = sum( (y(i)-y_est(i))**2 for i in range(N) ) 
+            
+
+    With this error formulation we can do STOCHASTIC GRADIENT DESCENT
+                                         ---------------------------
+
+                    - Move in direction of gradient of error wrt only one sample at a time
+                    - Perfect for us since at every step of the game we have one sample to look at anyways
+
+
+   Gradient Descent
+   ----------------
+        theta = theta - alpha * dE/dtheta     
+                                
+                                * alpha: learning rate
+
+    This would work for every model not just linear.
+
+   Gradient Descent for linear models:
+   -----------------------------------
+       V_est(s, theta) = theta.T * phi(s) = theta.T * x
+
+        dV_est(s,theta)
+        _______________  =  x
+            dtheta 
+
+
+        theta = theta + alpha * (G - V_est(s, theta))*x
+
+
+  What we were doing before in previous classes were actually an instance of gradient descent.
+
+
+
+Feature Engineering
+-------------------
+
+Neural networks can in some sense find good nonlinear transformations/features of raw data
+But since we only study linear methods in this course -> we need to find features manually
+
+
+Mapping s -> x
+
+    States can be thought as categorical values ( (0,0) -> category 1, (0,1) -> category 2 etc. )
+
+    We can use one-hot encoding!
+               ----------------
+
+D = |S|         s = (0,0)  => x = [1,0,0,...]    
+                s = (0,1)  => x = [0,1,0,...]
+
+    Dimensionality is the size of |S|. Cardinality is the number of dimensions. For each state we set one of the 0's to 1.
+    
+    Problem is that it requires lots of space - does not compress it down. 
+    So we haven't made any improvement with one hot encoding over the original V(s) size problem.
+
+    On the other hand one-hot encoding can validate if a model is bad.
+
+Alternative to one-hot encoding:
+    
+    Gridworld -> each (i,j) represents a position in 2D space
+    More like 2 real numbers than a category
+    Vector x can be (i,j) itself
+    Mean should be 0 and var = 1.
+
+    Feature vector could actually be the RAW data itself!
+            (x1,x2) = (i,j)
+            
+                ||
+                \/
+
+BUT the problem with raw values is that the model is linear.
+In case of gridworld: for fixed j, V(i) is just a line on the plane.
+
+      || 
+      \/ solution
+
+Polynomials
+-----------
+From linear regression class: we can make new features by creating polynomials.
+From calculus: infinite Taylor expansion can approximate any function.
+
+Second order terms: x1**2, x2**2, x1*x2
+
+Careful not to overfit with higher order polynomials!
+
+
+
+Monte Carlo prediction with approximation
+-----------------------------------------
+
+- We will use MC for prediction first
+- Replace V(s) with linear model
+
+
+    2 main steps:
+        
+        1) Play game -> sequence of states, returns 
+        2) Update V(s) using return as the target and V(s) as the prediction == mean of all returns of all states, also gradient descent
+                
+                    V_est(s) = V_est(s) + alpha*(G(s) - V_est(s))
+                    
+                We want stochastic gradient descent in respect of theta.
+                    
+                    theta = theta + alpha*(G - V_est(s,theta)) * x
+
+-------------------------------------------------------------------
+pseudocode:
+"""
+For a fixed policy since we are doing a prediction problem.
+return g is the target.
+"""
+    def mc_approx_prediction(pi):
+        theta = random
+        for i in range(1,N):
+            states_and_returns = play_game
+            for s, g in states_and_returns:
+                x = phi(s)
+                theta = theta + alpha*(g - theta.T*x)*x
+
+
+code: approx_mc_prediction.py
+
+-------------------------------------------------------------------
+
+
+
+
+TD(0) with approximation
+------------------------
+
+
+Main diff between MC and TD is that with TD we do not use G. We use r + gamma*V(s') to estimate G.
+                                                                    ---------------
+
+        theta = theta + alpha*( r + gamma*V_est(s', theta) - V_est(s, theta) ) * ( dV_est(s,theta) / dtheta )
+        
+        theta = theta + alpha*(target - prediction) * (dprediction/dtheta)
+
+Problem: The issue is that the 'target'(r + gamma*V(s')) is not the real target just an estimate(prediction based on the model). 
+It still works well in practice so we do it anyway.
+
+We call it a semi-gradient method since the target we are using is not a real target -> gradient is not a true gradient!
+            semi-gradient
+            -------------
+
+With TD no need to calculate returns - use rewards directly!
+
+
+Code: approx_semigradient_td0_prediction.py  - only policy evaluation is going on here not optimization
+
+
+
+
+
+Semi-Gradient SARSA
+-------------------
+
+SARSA with approximation
+We will approximate Q. 
+More difficult then approximating V since instead of of approximating |S| values we need to approx |S|x|A| values.
+
+Prediction again appears in the target.
+
+Features:
+--------
+
+(s,a) -> x
+
+
+Simple idea: take our old encoding of s (row,col,row*col) and add one-hot encoding of actions
+x = (r,c,r*c, U, D, L, R, 1)
+
+The above is not expressive enough! Try to implement it!
+
+Instead we could have as features:
+    6 features per every 4 action: [r, c, r*r, c*c, r*c, 1] - U, [...] - D, [...] - L, [...] - R
+    + 1 extra bias = 25 features in total
+
+Tabular method in contrast has 9 states x 4 actions = 36 features
+
+
+Code: approx_semigradient_sarsa_control.py
+------------------------------------------
+    - Goal: find the optimal policy
+
+Semigradient method since the target is not a true target because it uses a model prediction.
+Gradient is not a true one so we call it semi-gradient.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
