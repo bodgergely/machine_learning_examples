@@ -1,0 +1,284 @@
+
+===========================
+Deep Reinforcement Learning
+===========================
+
+Review of MDP
+=============
+
+Markov Decision Processes
+
+MDP:
+    - States
+    - Actions
+    - Rewards
+    - State Transition Probabilities
+    - Discount Factor (gamma)
+
+Markov property
+===============
+
+Next state-reward probability only depends on the previous state-action.
+
+P[s(t+1), r(t+1) | s(t), a(t), s(t-1), a(t-1),...,s(1), a(1)] = P[s(t+1), r(t+1) | s(t), a(t)]
+
+P(s',r|s, a)
+
+Discount factor
+===============
+
+The further we look into the future the harder it is to predict.
+Therefore discount future rewards to make them matter less.
+
+Return
+======
+
+    ---------------------------------------------------------
+    G(t) = sum( gamma**tau * R(t+tau+1)  for tau=0 to inf)
+    ---------------------------------------------------------
+
+Value function
+==============
+    ----------------------------------------------
+    | The Expected Return from being in State s. |
+    ----------------------------------------------
+
+Because the rewards(R) are probabilistic and Returns(G) are sum of rewards they are also probabilistic.
+We can still define the expected value --> Value function
+                                           --------------
+
+   V(s, policy) = E[G(t)|S_t=s, policy] = E[sum(gamma**tau * R(t+tau+1) for tau=0 to inf ) | S_t=s , policy]
+
+
+    Value function is the estimate of the return from this point forward.
+                          ----------------------------------------------
+
+----------------------------
+                           |
+State-value function:      |
+    V(s)                   |
+                           |
+Action-value function:     |
+    Q(s,a)                 |
+                           |
+----------------------------
+
+Predition Problem
+=================
+
+Given a fixed policy ==> finding V or Q  is the prediction problem.
+
+Control Problem
+===============
+
+Find the optimal policy. 
+
+Policy
+======
+Denoted by: pi
+
+    - Deterministic
+    - Probabilistic
+
+
+    V(s, policy) =   E[ G(t) | S_t=s, given policy]
+    
+    Q(s,a, policy) = E[ G(t) | S_t=s, A_t=a,  given policy]
+
+
+Control problem
+===============
+
+Q(s,a) is best used in the control problem. Tells us the best Action 'a' given a State 's'.
+With V(s) we actually need to to perform the action to see what the next state s' is to determine the best action.
+
+pi = policy
+
+    pi(s) = argmax(sum( P(s',r|s,a)*(r+gamma*V(s'))  for a in all_action ) , a) 
+
+    pi(s) = argmax(Q(s,a), a)
+
+
+Episodes
+========
+
+Example: One run of tic-tac-toe.
+
+An agent will need to play many episodes in order to learn an optimal policy.
+Tasks that end are called episodic tasks.
+                          --------------
+Tasks that last forever are continuing tasks.
+
+Terminal state: state where an episode ends. ( no action can be taken anymore for any reason )
+
+Terminal state has value zero since the value functino captures the future rewards.
+
+------------------------------------------------------------------------------------------------------------------------------
+
+
+Dynamic Programming
+===================
+
+First solution to MDPs.
+Pioneered by Richard Bellman. 
+Bellman equations for MDPs allow us to define the value function recursively.
+
+
+V_pi(s) = sum(pi(a|s)*sum(sum( P(s',r|s,a) * (r+gamma*V_pi(s'))  for r in all_rewards) for s' in all_states)  for a in all_action )
+
+The above is basically a linear system of equations.
+
+V(s1) = a11 * V(s1) + a12 * V(s2) + ... + a1n*V(sn)
+V(s2) = a21 * V(s1) + a22 * V(s2) + ... + a2n*V(sn)
+.
+.
+.
+
+One equation for each state in the state space.
+
+Iterative Policy Evaluation
+---------------------------
+    
+Prediction problem: Given a policy -> find the value function
+
+V_pi(s) = sum(pi(a|s)*sum(sum( P(s',r|s,a) * (r+gamma*V_pi(s'))  for r in all_rewards) for s' in all_states)  for a in all_action )
+
+Simply keep recalculating the right hand side and assign to the left until no more change.
+Why? Bellman's equation says they should be equal.
+
+
+Policy Iteration
+----------------
+
+Control problem: find the best policy
+
+While not converged:
+    1) Evaluate policy
+    2) Improve policy (take the argmax over Q(s,a))
+
+
+Value Iteration
+---------------
+
+Instead of waiting for policy evaluation to converge just do 1 iteration.
+It will still converge. No explicit policy improvement step. Just take the argmax in the policy evaluation step.
+
+V_k+1(s) = max( sum(sum( P(s',r|s,a) * (r+gamma*V_k(s')) for r in all_rewards ) for s' in all_states)  for a in all_actions )
+
+Taking the max when updating the value function. THe evaluation and the improvement happens at the same time.
+
+
+Dynamic Programming lays the foundational ideas for other algorithms but it is not very practical.
+We need to loop through all states on every iteration. State space might be very large or infinite.
+
+DP requires us to know the model of the environment, the P(s',r|s,a), the state transition probabilities.
+Calculating that can be infeasible. Doesn't learn from experience.
+In contrast MC and TD does learn from experience. No model of the environment is needed. MC and TD updates the Value function only for states that were experienced.
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Monte Carlo methods
+===================
+
+Unlike DP, MC is about learning from experience. 
+Expected values can be approximated by sample means.
+
+Idea: Play many episodes, gather returns -> average them!
+
+    V(s) = E[ G(t) | S(t)=s] = 1/N * sum(G[i,s] for i=1 to N)
+
+    Value function -> Expected value of the Return after landing in State 's'.
+
+
+Only gives us values for states we encountered. If we never encountered a state -> its value is unknown.
+Control problem -> use policy iteration.
+
+Control Problem
+---------------
+
+1. Initialize random policy
+2. While not converged:
+    a) Policy Evaluation step: Play an episode -> recalculate the value function based on the returns for each state
+    b) Policy Improvement step: based on current Q(s,a) - take the argmax
+
+We want to use Q(s,a) and not V(s) since doing look-ahead search is not practical since we dont have control over the environment. 
+
+Because we update the policy on each iteration of this loop the returns we sample are for different policies however it does not matter and MC method still converges.
+
+Disadvantages of MC:
+
+ - It does not always work. Requires many episodes. What if we are not doing an episode? What if we end up in an infinite loop? 
+One solution is to penalize these loops. 
+ 
+ - MC can leave many states unexplored. One solution is the random starts, "exploring starts" method - start each episode from random state
+    Another solution is "epsilon-greedy" with small probaility epsilon we take a random action so will explore other states we otherwise would not
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+Temporal Difference Learning
+============================
+
+TD Learning. 
+Unique to RL. 
+MC: sample returns based on episode.
+TD: estimate returns based on current estimated value function.
+
+TD(0)
+
+Instead of looking at G which is the sample return we use r + gamma*V(s') which estimates the return from the next state from and onward.
+r is still the sample we got from playing the episode. 
+
+
+Calculating means
+-----------------
+
+Made a big deal about it in the RL1 course. 
+Basic naive way
+---------------
+    - Collect all samples, sum them, divide with N. -> space inefficient
+
+Of course we can calculate mean from the previous mean as done below:
+
+    V_t(s) = V_t-1(s) + 1/t*(G_t - V_t-1(s)) = 1/t * sum(G_t' for t'=1 to t)
+
+The above is basically gradient descent!
+
+Generalized form:
+    V(s) = V(s) + alpha*(G-V(s))
+
+Learning rate does not have to be 1/t it can be anything (alpha).
+
+
+TD(0)
+-----
+
+- Instead of G we use r and V.
+- True online learning! Only need to wait until t+1 to update value for state at time t
+- MC - need to wait until entire episode is over
+
+                        ||
+                        \/
+
+          Can learn during the episode, can be used for long or non-episodic tasks!
+
+
+    V(s) = V(s) + alpha*(G - V(s))
+
+    -------------------------------------------------------------
+    |                                                           |
+    |   V(s_t) = V(s_t) + alpha*(r + gamma*V(s_t+1) - V(s_t))   |
+    |                                                           |
+    -------------------------------------------------------------
+
+
+
+
+
+
+
