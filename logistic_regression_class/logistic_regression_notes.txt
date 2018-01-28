@@ -1,0 +1,616 @@
+
+Outline:
+--------
+    - Classification
+    - Linear classifiers
+    - Neurons and perceptron
+    - Logistic regression schematic
+    - Feed-forward mechanism, probabilistic interpretation
+    - Cross-entropy error function
+    - Maximum likelihood
+    - Gradient descent
+    - practical problems: regularization, donut problem, XOR problem
+
+
+All machine learing algos tries to optimize an objective function.
+                                               ------------------
+What should be the objective function? How should we optimize it?
+How to apply gradient descent to optimize the logistic regression objective.
+
+
+Classification problem: 
+----------------------
+
+    Machine learning:
+    -----------------
+        - Supervised: we have labels for the data
+        - Unsupervised: no label, goal is to split the data into groups, clusters by looking for patterns
+
+    - Supervised learning:
+      -------------------
+        - Regression: trying to predict the value of some real-valued function
+        - Classification: split the data into categories (logistic regression)
+
+Logistic regression:
+--------------------
+Oddly called regression but used for classification.
+Examples: MNIST dataset - what digit classification
+          Image classification
+
+
+Cource project:
+---------------
+E-commerce store data.
+Data in csv format, table.
+Header:
+    - is mobile (0/1)
+    - N_products_viewed (int >= 0)
+    - visit_duration (real >= 0)
+    - is_returning_visitor (0/1)
+    - time of day (0/1/2/3 = 24h split into 4 categories, assumptions? - users in the same bucket will behave similarly)
+    - user action: labels => (bounce/add_to_cart/begin_checkout/finish_checkout)
+
+User action is what we predict.
+Logistic class(this course): binary classification
+Neural networks class: multi-class classification
+
+Data processing:
+---------------
+Logistic regression/neural networks work on numerical vectors, not categoris
+One-hot encoding (vector where for each category one has 1 and the others have 0)
+-------
+If we have 3 different categories we will use 3 different columns to represent them.
+
+Numerical data: Normalization required. (xi - mean)/stddev(x)
+    This way the sigmoid function will have a more pronounced effect.
+
+    Normalization: Make them centered around 0 and also divide it with the stddev.
+
+Code: folder: ann_logistic_extra
+
+
+Linear classification
+---------------------
+https://www.udemy.com/data-science-logistic-regression-in-python/learn/v4/t/lecture/3962998?start=0
+
+Line on 2D plane:
+    y = mx + b          where m is the splope and b is the y intercept
+
+    or
+
+    0 = a*x + b*y + c   where    a = 1, b = -1, c = 0
+
+
+h(x) = w0 + w1*x1 + w2*x2   
+    
+        we say h(x) is a linear combination of the components of x!
+                         ------------------
+
+in vector form: h(x) = w.T*x
+
+
+Neurons
+-------
+https://www.udemy.com/data-science-logistic-regression-in-python/learn/v4/t/lecture/3963002?start=0
+
+h(x,y) = x - y
+
+h(2,1) = 1 > 0 --> 'o'
+ 
+Neurons transmit information.
+
+Dendrite - Cell body - Axon - Axon terminal
+
+Hodgkin-Huxley model:
+
+    Extracellular medium - Intracellular medium
+    Electric circuit model. 
+FitzHugh-Nagumo:
+    More non-linear differential equations
+    We do not want to deal with these
+
+Neuron analogies:
+    - Many inputs -> one output
+    - spike or not spike -> 0/1 output
+    - synapse strength -> linear weights
+
+One neuron axon transmits a signal to another neuron's dendrite. This point of connection is called a synapse.
+A signal at this synapse can be excitatory or inhibitory. So it can add to or subtract from the signal.
+Subtracting from the signal will cause a decrease in the total signal making it less likely for an action potential to occur. These are like having a negative weight in logistic regression.
+
+
+https://www.udemy.com/data-science-logistic-regression-in-python/learn/v4/t/lecture/3963004?start=0
+
+      x1
+    ------X-\ w1*x1
+             \
+              Fun---Y----       x1, x2 inputs, w1, w2 weights, Fun: function applied to w1*x1+w2*x2,
+      x2     /w2*x2                                                 Fun(w1*x1+w2*x2) = Y
+    ------X-/
+
+    In logistic regression Fun is Sigmoid() function. 
+
+                         _________
+    Sigmoid:            /
+                       / <-- this is curved    S-shaped function
+                ______/
+
+        2 types:
+    
+         - hyperbolyc tangent:
+               tanh(X) -> (-1,1)  where y intercept is zero. 
+
+         - sigma: sigmoid(z) = 1 / (1 + e**-z)
+
+            ---------------------------------------------
+            |                                           |
+            |         sigmoid(z) =   ____1_____         |
+            |                         1 + e**-z         |
+            |                                           |
+            ---------------------------------------------
+
+                Values: (0,1) and y intercept is 0.5 meaning sigmoid(0) = 0.5
+
+        
+sigmoid(w.T*x)         if the product is very positive we will get a number almost 1. If very negative then very close to zero.
+
+if the inner product was zero 0 we get 0.5. So the inner product is sensitive around the zero area. That is the area where the slope is the largest and the sigmoid function changes the most.
+
+w.T*x > 0 or sigmoid(w.T*x)  >  0.5  --->  class 1
+w.T*x <= 0 or sigmoid(w.T*x)  <= 0.5  --->  class 0
+
+
+code: logistic_regression_class/logistic1.py
+
+code: ann_logistic_extra/ecommerce_data.csv
+
+code: ann_logistic_extra/process.py
+
+code: ann_logistic_extra/logistic.py
+
+Section summary:
+
+    We saw what logistic regression model "looks like"
+    For context we can have other types of models like decision trees or k-nearest neighbors
+    
+    Logistic regression makes the assumption that your data can be separated by a line/plane
+
+
+    ---------------------------------------------------------------------------------------------------
+
+    Modeling: 
+    --------
+    
+        We make assumptions about the mathematical form and later work follows from these assumptions
+
+
+                        y = sigmoid(w.T * x)
+             
+
+    ---------------------------------------------------------------------------------------------------
+
+                                         
+    This section so far just have been how does the above model make a prediction.
+    How do we get: 
+                input --> output
+
+
+    Next section: How do we find the weights?? 
+
+
+Section 3: Solving for the optimal weights
+------------------------------------------
+
+We can make predictions with the above model (y = sigmoid(w.T*x)) BUT How do we find the optimal weights?
+
+Logistic regression === is a linear model
+
+We have: 
+        x - input features weighted with by w. We take a linear combination of the weights and the input features.
+                                                         ------------------
+        Then we pass this lin combination through the sigmoid function which squashes the input between 0 - 1.
+        (it has value 0.5 at 0)
+
+            y = sigmoid(w.T*x)
+
+How do we find these weights?
+We need to use probabilistic reasoning - training.
+                                         --------
+
+Training or learning is finding the parameters of your model that make it accurate.
+========
+
+       
+Bayes Rule
+----------
+
+    ---------------------------------------
+    |    P(Y|X) - posterior               |
+    |    P(X|Y) - likelihood              |
+    |    P(Y)   - prior                   |
+    |                                     |
+    |    P(Y|X) = P(X|Y) * P(Y) / P(X)    |
+    ---------------------------------------
+
+i.e: 
+    P(Y=1|X) = P(X|Y=1) * P(Y=1) / P(X)
+    P(Y=0|X) = P(X|Y=0) * P(Y=0) / P(X)
+
+    - P(X|Y) is the Gaussian likelihood - we calculate it(mean and covariance) over all data that belongs to class Y
+    - P(Y)   is just the frequency estimate(maximum likelihood estimate) of Y : e.g. P(Y=1) = #times class 1 appeared / # total
+
+Put Bayes rule into the logistic regression model!
+
+p(y=1|x) = p(x|y=1) * p(y=1) / p(x) = p(x|y=1) * p(y=1) / ( p(x|y=1)*p(y=1) + p(x|y=0)*p(y=0) )
+
+Divide top and bottom by p(x|y=1)p(y=1)
+
+    p(y=1|x) = 1 / ( 1 + ( p(x|y=0)*p(y=0) / p(x|y=1)*p(y=1) ) )
+
+    Looks a lot like Logistic Regression!
+
+
+    p(y=1|x) = 1 / ( 1 + ( p(x|y=0)*p(y=0) / p(x|y=1)*p(y=1) ) ) = 1 / (1 + exp(-1*w.T*x))
+
+    -1*w.T.x = ln(p(x|y=0)*p(y=0) / p(x|y=1)*p(y=1))
+
+
+Linear Discrimant Analysis
+Quadtratic Discriminant Analysis: if we have different covariances
+
+This closed form solution is only optimal if the assumptions about the distributions are true. Which is usually not the case.
+That is why gradient descent is usually preferred.
+
+
+Cross-entropy Error function
+----------------------------
+
+Linear Regression - Squared Error function, assumes Gaussian distributed error
+
+Logistic Regression Error can't be Gaussian distributed because:
+        - Target is only 0/1
+        - Output is only a number between 0-1
+
+---------------------------------------------------------------------------------------------------
+Cross Entropy Error: 
+            
+        J = -1* ( t*log(y) + (1-t)*log(1-y) ) 
+                                                    where t = target, y = output of the logistic
+---------------------------------------------------------------------------------------------------
+
+
+If t = 1 => only the first term matters
+If t = 0 => only the second term matters
+
+log(y) --> number between [0, -inf]
+
+Examples:
+    - t=1, y=1 -> 0
+    - t=0, y=0 -> 0
+    - t=1, y=0.9 -> 0.11
+    - t=1, y=0.5 -> 0.69
+    - t=1, y=0.1 -> 2.3
+
+
+Multiple training examples
+--------------------------
+
+J = -1 * sum( tn*log(yn) + (1 - tn)*log(1 - yn)  for n=1 to N )
+
+we just simply sum up all the individual errors.
+
+
+Code: logistic2.py
+
+
+Maximum likelihood
+------------------
+------------------
+
+Biased coin:
+P(head) = p
+P(tail) = 1 - p
+
+
+Experiment to determine p! 
+i.e.: N = 10 experiment -> 7H, 3T
+
+What is the likelihood of this event exactly?
+    L = p**7 * (1-p)**3        # take log
+    
+    l = log(p**7 * (1-p)**3)   # now we can use the multiplication rule
+      = log(p**7) + log((1-p)**3)   # now the power rule
+      = 7*log(p) + 3*log(1-p)
+
+    # now set the derivative equal to zero:
+    # since dlog(x)/dx = 1/x
+
+    dl/dp = 7/p + 3/(1-p)*(-1) # make this equal to zero
+    7/p + 3/(1-p)*(-1) = 0      # and solve for p
+    7/p = 3/(1-p)
+    (1-p)/p = 3/7
+    1/p - 1 = 3/7
+    1/p = 10/7
+    p = 7/10        # probability of heads, P(Head)
+
+Let's apply this to logistic regression, y=1 is like being head
+
+P(y=1|x) = sigmoid(w.T*x) = y
+
+L = product( y_n**t_n * (1-y_n)**(1-t_n)   for n=1 to N)
+l = sum( t_n*log(y_n) + (1-t_n)*log(1-y_n) for n=1 to N )   # this is the same form as the cross entropy error function just with different sign
+Maximazing the log-likelihood is the same as minimizing the cross entropy error
+
+
+Gradient descent optimization of the weights
+============================================
+https://www.udemy.com/data-science-logistic-regression-in-python/learn/v4/t/lecture/3963178?start=0
+
+Gradient descent:
+-----------------
+    Idea: take small steps in direction of the derivative
+        step size == learning rate
+Works for any objective function where we can take the derivative.
+
+How do you choose the leaarning rate? Need to experiment.
+
+Gradient descent for logistic regression
+----------------------------------------
+    J = -1*sum(tn*log(yn) + (1-tn)*log(1-yn) for n=1 to N )
+
+    Chain rule - no need to do all at once
+        We can first dJ/dyn, dyn/dan, dan/dwi
+    an = w.T*xn         an: activation on the nth sample
+    
+    dJ/dwi = sum(dJ/dyn * dy/dan * dan/dwi  for n=1 to N )
+
+    dJ/dyn = - tn*1/yn + (1-tn)*1/(1-yn)*(-1)
+
+    yn = sigmoid(an) = 1/(1+e**-an)
+
+    dyn/dan = -1/(1+e**-an) * (e**-an) * (-1)
+
+    dyn/dan = e**-an / (1+e**-an)**2 = 1/(1+e**-an) * e**-an/(1+e**-an) =
+                = yn*(1-yn)
+    
+    an = w.T*x
+    
+    an = w0*xn0 + w1*xn1 + w2*xn2 + ...
+
+    dan/dwi = xni
+
+    Putting all these together by the chain rule:
+
+
+        dJ/dwi = -1 * sum( tn/yn*yn*(1-yn)*xn - (1-tn)/(1-yn)*yn*(1-yn)*xni  for n=1 to N )
+
+    ------------------------------------------------------
+    |   dJ/dwi = sum( (yn - tn)*xni  for n=1 to N )      |
+    ------------------------------------------------------
+     
+    Vectorize over features:
+        
+        dJ/dw = sum( (yn - tn)*xn  for n=1 to N )
+
+    vectorize over samples:
+        
+        a.T*b = sum(an*bn for n=1 to N )
+        
+        X is NxD
+        Y, T are Nx1
+
+        Multiply X.T*(Y-T):
+                 (DxN)*(Nx1) -> (Dx1) -> correct shape for w
+
+        N gets summed over
+
+     ------------------------
+     |                      |
+     |  dJ/dw = X.T*(Y-T)   |
+     |                      |
+     ------------------------
+
+
+    Bias term:
+        dJ/dw0 = sum( (yn-tn)*xn0  for n=1 to N ) = sum( yn-tn  for n=1 to N )
+
+Gradient descent in code:
+  Code: logistic3.py
+
+Code:
+    ann_logistic_extra/logistic_train.py
+
+
+Section summary of training in logistic regression
+--------------------------------------------------
+
+How to find the weights of a logistic regression model given the training data.
+No general closed source formula to find the weights.
+
+    - first solution: Bayes rule if each class is Gaussian distributed with equal covariance - this assumption might not be true at all - quite limited
+    - general solution: gradient descent on cross entropy(negative log-likelihood)
+
+
+
+Section - Practical Issues with Logistic regression
+---------------------------------------------------
+
+2 essentail parts of LR.
+
+1) Prediction: inputs -> outputs
+2) Training: finding w by constructing an objective function and minimizing it using gradient descent - we call this learning, training or fitting
+    
+    For any ML model we must know how to do these 2 things
+
+
+2 Issues:
+    - Regularization
+    - Overfitting
+
+
+How to deal with irrelevant features? Those are the ones that cause overfitting.Need to bring their weights down to 0.
+
+
+The straightline or hyperplane created by logistic regression is too limiting.
+It can not curve. There are some data sets that are separable but not by a line or hyperplane.
+
+Regularization
+--------------
+
+Penalizes large weights.
+Existing cost function:
+
+            J = -[t*log(y) + (1-t)*log(1-y)]
+
+Now add a penalty of large weights:
+            
+       J_reg = J + (lambda/2)*norm(w,2) = J + lambda/2 * w.T*w
+
+lambda: smoothing parameter (usually 0.1,1) but depends on the data
+If lambda is larger the weights will go closer to zero.
+
+Solving for w with regularization:
+----------------------------------
+
+still do gradient descent
+dJ_reg/dw instead of dJ/dw
+
+reg_cost = lambda/2 * (w0**2 + w1**2 + ...)
+d(reg_cost)/dwi = lambda*wi
+
+d(reg_cost)/dw = lambda*w
+
+    --------------------------------------
+    |                                    |
+    |  dJ_reg/dw = X.T*(Y-T) + lambda*w  |
+    |                                    |
+    --------------------------------------
+
+w ~ N(0, 1/lambda) ==> prior
+
+Our prior belief is that w is Gaussian distributed with variance 1/lambda
+
+
+Bayes rule
+==========
+
+P(w|X,Y) ~= P(X,Y|w)  *  P(w)
+posterior   likelihood   prior
+
+P(B|A) = P(A|B)*P(B)/P(A) = P(A,B)/P(A)
+
+Without regularization we maximize the likelihood
+with    regularization we maximize the posterior
+
+This is called "maximum posteriori" or MAP estimation
+
+Code: logistic4.py
+
+
+L1 Regularization
+=================
+
+
+We want D << N. We want much less features than samples.
+
+We want sparsity. Most weights should be 0 -> achieving sparsity.
+
+L1 regularization adds the L1 norm for penalty term.
+
+L2 reg. is called Ridge regression.
+L1 reg. is called Lasso regression.
+
+With L1 we put a prior Laplace distribution on the weights.
+
+p(w) = lambda/2 * exp(-lambda*|w|)
+
+        dJ/dw = X.T*(Y-T) + lambda*sign(w)
+                where sign(x) = 1 if x > 0, -1 if x < 0, 0 if x == 0
+
+Use the same gradient descent algorithm we have been already using.
+
+
+Code: l1_regularization.py
+
+
+Code: logistic_donut.py
+
+Code: logistic_xor.py
+
+xor and donut problems need some manual feature engineering in order to improve the classification rate! 
+Neural networks can automatically find these features!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
