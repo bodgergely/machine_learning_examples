@@ -1,0 +1,424 @@
+
+
+----------------
+Code: lr_1d.py |
+----------------
+
+
+Code moore.py
+
+
+Need to know the formula to derive the a and b for ax + b = y model.
+Also need to know R squared formula to check accuracy of the model.
+    R = 1 - sum_squared_diff_from_est / sum_squared_diff_from_mean
+
+
+Multiple Linear Regression
+--------------------------
+--------------------------
+
+Video: https://www.udemy.com/data-science-linear-regression-in-python/learn/v4/t/lecture/6444572?start=0
+
+multiple factors, inputs. 
+multiple inputs -> output
+
+for simple linear regression:
+    {(x1,y1), (x2,y2)...(xn,yn)} 
+
+We still have the above but xi represents a vector not a scalar.
+
+--------------------------------------------------------
+Dimensionality: size of x, represented by the letter D |
+--------------------------------------------------------
+
+Means that the weight is also of size D. => wx + b = y
+
+    -------------------------------------
+    |   Model: y_est = w.T * x + b      |
+    -------------------------------------
+
+            y_est = w.dot(x) + b
+
+
+We can absorb b into w by adding an extra 1 to the feature vector x.
+Rename b to w0, append x0 which is always 1.
+
+    y_hat = b + w1*x1 + ... + wd*xd
+    y_hat = w0*x0 + w1*x1 + ... + wd*xd = w.T * x where x0 = 1
+
+
+We just need to append a column of 1s into our data matrix X (originally size of NxD)
+
+
+Data matrix is NxD size. N samples and D features per sample. One row of X represents one sample of X. 
+One sample has shape of 1xD => feature vector. 
+
+In linear algebra the convention is that a vector is a column vector, [n x 1]
+
+Need to have: Y_Nx1 = X_NxD * W_Dx1
+
+Meaning that when we calculate we need to have the weight vector on the right hand side.
+
+We also want to calculate all samples at once not separately since Numpy is optimized for that.
+
+Solving the weight tuning
+-------------------------
+
+Use Calculus.
+
+Error function is still sum of squares of the differences.
+        
+                E = sum((yi-yi_hat)**2 for i in range(N) )
+                E = sum((yi-w.T*xi)**2 for i in range(N) )
+                
+We can still take the derivative of w with respect of any component, w1..wD
+
+        dE/dwj = ?, j=1..D
+
+X is the matrix, X_ij
+i - sample #
+j - feature #
+
+
+    dE/dwj = sum(2*(yi - w.T*xi)*(-1* (d(w.T*xi))/dwj ) for i in range(1, N+1) ) =
+=            sum( 2(yi - w.T*xi)*(-xij)    for i in range(1, N+1))
+
+
+There are j=1..D of the above and we need to set all of them to zero so we have D equations and D unknowns(w1..wd)
+
+
+        sum( yi*(-xij) for i=1..N) - sum(w.T * xi(-xij)  for i=1..N ) = 0
+        
+        sum(w.T*xi*xij  for i=1..N ) = sum( yi*xij for i=1..N )  
+
+
++++++++++++++++++++++++++
+DPD
+0844 824 0530
+plus tracking number: 15505104177089
+++++++++++++++++++++++++
+
+ 
+        w.T * sum(xi*xi1  for i=1..N ) = sum( yi*xi1  for i=1..N ) 
+        w.T * sum(xi*xi2  for i=1..N ) = sum( yi*xi2  for i=1..N ) 
+        . 
+        .
+        w.T * sum(xi*xiD  for i=1..N ) = sum( yi*xiD  for i=1..N ) 
+
+
+    Take the transpose of both sides:
+                w.T*(X.T*X) = y.T*X   
+
+                [w.T*(X.T*X)].T = [y.T*X].T
+                
+                ---------------------
+                | (X.T*X)*w = X.T*y |
+                ---------------------
+
+Solution to multiple linear regression:
+
+    ---------------------------------------------------------
+    |                                                       |
+    |    A*x = b  ->   x = A**-1 * b                        |
+    |                                                       |
+    |    (X.T*X)*w = X.T*y ->  w = (X.T*X)**-1 * X.T*y      |
+    |                                                       |
+    ---------------------------------------------------------
+
+
+----------------------------------------------------------------------------
+Numpy has a special function for this:
+    
+    A*x = b    =>    x = np.linalg.solve(A,b)
+                         ---------------
+
+    w = (X.T*X)**-1 * X.T*y   --->   w = np.linalg.solve(X.T*X, X.T*y)
+
+----------------------------------------------------------------------------
+
+
+Solving Multiple Linear Regression using Matrixes
+-------------------------------------------------
+-------------------------------------------------
+
+Cost function: sum((ti - yi)**2)
+    ||
+    \/  
+
+J = (t - y).T * (t-y)  where
+
+        t = Nx1 matrix of targets
+        y = Nx1 matrix of predictions
+
+            - y = X*w
+            - X = NxD matrix
+            - w = Dx1 vector of weights
+            - X * w ==> y which is Nx1
+
+Derivative:
+    Matrix Cookbook: https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
+    We want to calculate the dJ/dw
+    
+    First we have to expand J.
+    J = (t-y).T * (t - y) = t.T*t - t.T*y - y.T*t + y.T*y = t.T*t - t.T*X*w - (X*w).T*t + (X*w).T*(X*w) =
+                = t.T*t - t.T*X*w - w.T*x.T*t + w.T*X.T*X*w
+
+
+    Now:
+        dJ/dw = -2*X.T*t + 2*X.T*X*w = 0   --->   X.T*X*w = X.T*t  ---> w = (X.T*X)**-1*X.T*t
+
+----------------
+code: lr_2d.py |
+----------------
+
+
+Polynomial regression:
+code: lr_poly.py
+
+We can still use linear regression for a polynomial function estimation.
+
+
+code: systolic.py
+
+code: overfitting.py
+
+
+Where does the squared difference error come from: 
+    
+    Maximum likelihood
+    ==================
+    
+
+L2 Regularization
+-----------------
+
+Idea: Penalty on large weights.
+
+How to deal with outliers?
+Outliers may impact the weights too much! One or two outliers can have huge impact on the best line fit.
+
+---------------------------------------------------------------------
+Penalize large weights by adding their squared magnitude to the cost!
+---------------------------------------------------------------------
+    J = sum((y_n-y_hat_n)**2 for n=1..N) + lambda * |w|**2
+                                           ---------------
+            where |w|**2 = w.T*w = w1**2 + w2**2 + ... + wd**2
+
+    We don't want to end up with large weights.
+
+
+We need to solve the derivation of the new J again. 
+
+dJ/dw = -2*X.T*Y + 2*X.T*X*w + 2*lambda*w = 0
+
+(lambda * I + X.T*X)*W = X.T*Y          where I => identity matrix
+
+w = (lambda*I + X.T*X)**-1 * X.T*Y
+
+L2 regularization is used to prevent the model from overfitting to outliers by penalizing large weights!
+Also called "Ridge Regression".
+Add squared magnitude of weights times a constant lambda to the cost function.
+Encourages weights to be small.
+
+
+Gradient Descent
+----------------
+
+Optimization method. 
+
+Used extensively in deep learning - useful in a variety of situations.
+
+Idea: Function you want to minimize (or maximize - just switch signs):
+    
+        ie.: J(w) = cost of error 
+
+We want to find w that minimizes J.
+
+Example:    J = w**2    (We know that min is at w=0 but pretend we do not know)
+
+dJ/dw = 2*w     set initial w = 20, learning rate 0.1
+
+Iteration 1: w <- 20 - 0.1*2*20 = 16
+Iteration 2: w <- 16 - 0.1*2*16 = 12.8
+Iteration 3: w <- 12.8 - 0.1*2*12.8 = 10.24
+
+
+Gradient Descent for Linear Regression
+--------------------------------------
+
+Cost function to be minimized!
+
+            J = (Y - X*w).T * (Y - X*w)
+
+Gradient:
+            dJ/dw = -2*X.T*Y + 2*X.T*X*w = 2*X.T*(Y_hat - Y)
+
+Instead of setting it to 0 and solving for w - we will just take small steps in this direction.
+
+Can drop the 2 since it is a constant.
+
+w = draw sample from N(0, D)        where D is the dimensionality
+for i=1..T:
+    w = w - learning_rate*X.T*(Y_hat - Y)
+
+Can quit after T steps or a when change in w is smaller than a predetermined threshold!
+
+
+How do you choose the learning rate?
+------------------------------------
+Learning rate   - hyperparameter
+-------------
+
+It is called a "hyperparameter" since it is not part of the model itself but is used to find a solution.
+For linear regression it does not matter too much.
+    
+    - Too big   -> won't converge - will bounce back and forth across the "valley"
+    - Too small -> gradient descent will be slow
+
+Hyperparameter optimization is an active research area. 
+Need to gain intuition by practice. Putting hours of time into experimenting with different datasets.
+This intuiton needs to be earned ==> proportional to the time you put into it!
+
+
+L1 regularization
+-----------------
+
+We want D << N. (#features, #samples)
+
+Goal: Select a few important features that predict the trend
+
+Few weights are only non-zero. Most of them will be zero. --> "sparsity" 
+How to achieve this? L1 regularization. 
+
+
+L2 regularization used L2 norm for penalty term.
+L1 regularization uses L1 norm for penalty term.
+
+J_ridge = sum((yn - yhat_n)**2 for n=1..N ) + lambda*norm(w, 2)**2
+J_lasso = sum((yn - yhat_n)**2 for n=1..N ) + lambda*norm(w, 1)
+
+We need Laplace distributed weights when doing L1 regularization. 
+
+    p(w) = lambda/2 * exp(-lambda*|w|)
+
+
+J = (Y - X*w).T * (Y - X*w) + lambda*|w|
+J = Y.T*Y - 2*Y.T*X*w + w.T*X.T*X*w + lambda*|w|
+dJ/dw = -2*X.T*Y + 2*X.T*X*w + lambda*sign(w) = 0
+
+sign(x) = 1 if x > 0, -1 if x < 0, 0 if x == 0
+We can't solve for w.
+
+We need gradient descent to solve this problem!
+        ----------------
+
+Code: l1_regularization.py
+
+
+L1 vs L2 regularization
+-----------------------
+
+L1: encourages a sparse solution (few w's non-zero many equal to 0)
+L2: encourages small weights (all w's close to zero but not exactly zero)
+
+Both help prevent overfitting by not fitting to noise!
+
+L1 accomplishes this by choosing the most important features.
+L2 accomplishes this by making an assertion that none of the weights are extremely large.
+
+
+L2 penalty is quadratic - L1 is absolute function - key is the derivative
+                                                    ---------------------
+Quadratic: as w -> 0, derivative -> 0, if w is small further gradient descent won't change much.
+
+Absolute: derivative is always +/-1 (0 at w=0), does not matter where w is it will fall at a constant rate - when it reaches 0 it will stay there forever.
+
+L2 regularization encourages weights to be small
+L1 reguraliration encourages weights to be zero - sparsity
+
+
+It is possible to have both L1 and L2 in the model. 
+    ||
+    \/
+ ElasticNet
+ ----------
+
+J_elasticnet = J + lambda1*|w| + lambda2*|w|**2
+
+Adding the L1 and L2 penalty to the cost function.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     
+
