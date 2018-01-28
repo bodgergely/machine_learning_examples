@@ -1,0 +1,1676 @@
+Important concepts:
+ - Agent: thing that senses the environment that we are trying to code intelligenc into
+ - Environment: Real or simulated world that the agent lives in
+ - State: different configuration of the environment that the agent can sense
+ - Reward: agent tries to maximize not just the immediate but future rewards as well
+ - Action: what an Agent does in the Environment (example video game: UP, DOWN, LEFT, RIGHT) 
+
+
+Danger: Uninteded consequences if the goal is not formulated correctly. for instance goal is to minimize human deaths in the future. AI could wipe out humanity now so future deaths will be minimized.
+
+Other bad example: Robot to solve the maze. 
+        - Reward: 1 if solved and 0 if not solved
+        - Strategy: move randomly until maze is solved. -> Bad strategy since we never gave negative rewards for steps taken. So it is not efficient.
+        - Solution: give -1 for each step taken -> minimize the number of steps taken
+ 
+
+SAR triple: State + Action => Reward + New State
+(s,a,r) triple. State(t) + Action(t) => Reward(t+1) + State(t+1)
+    [State(t), Action(t), Reward(t+1)] also as (s,a,r)
+    [State(t), Action(t), State(t+1)]  aslo as (s,a,s')
+Reward is received in the next state.
+
+
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+
+
+
+
+Section 2
+
+Explore Exploit dilemma - Multi armed bandit
+-----------------------
+
+3 slot machines.
+Unknown winning rate for each machine
+Either 1 or 0 score when pulling an arm
+Goal is to maximize the score. You can discover the best bandit only by collecting data.
+Explore and exploit. We need to explore(collect data) and exploit(play the 'best so far' machine)
+
+Traditional A/B testing:
+    - predetermine how many times to play to collect data to obtain statistical significance. If the win rate differences are big you need small num of samples if small diff between rates then more samples required
+
+We don't care about the above (statistical significance testing) in this course.
+
+**explore-exploit** tradeoff: a human after playing 3 times and getting 2/3 and 0/3 on 2 machines have a strong urge to only play the 2/3 machine even if 3 samples is small. Small prob that the true probs are 67% and 0%.
+
+A/B testing and human emotions are suboptimal.
+
+
+## Epsilon Greedy strategy ##
+    - Very simple
+    - Choose a small number (epsilon) like 5% or 10% as a probability for exploration
+    
+def epsilon_greedy(eps):
+    p = random()
+    if p < eps:
+        pull_arm(random_arm)
+    else:
+        pull_arm(best_arm)
+
+In the long run we explore each arm an infinite number of times. 
+Problem: After certain iteration we get to a point where we should not be exploring. For epsilon=10% we spend 10% time in suboptimal things
+
+#### Estimating mean ####: 
+    We can use the old mean to get the new mean. No need to store all the historica rewards.
+    mean(X, N) = 1/N * sum(X, 1, N) = 1/N * sum(X, 1, N-1) + 1/N * X[N] = (N-1)/N * mean(X, N-1) + 1/N * X[N]
+    **********************************************************    
+      mean(X, N) = (1 - 1/N) * mean(X, N-1) + 1/N * X[N]
+    **********************************************************
+    
+    N-th mean can be calculted from the N-1th sample -> (1 - 1/N) * old_mean + 1/N * X[N]
+
+
+
+## Optimistic initial values ##
+
+Another way to solve the explore-exploit dilemma. Suppose we know the true mean of each bandit is << 10.
+Pick a high ceiling as the initial mean estimate. 
+    Before: X(0) = 0    Now: X(0) = 10
+Initial mean is too good to be true. All collected data will cause it to go down. 
+Example: If true mean is 1 then the sample mean will approach 1 as I collect more samples. 
+All means will eventually settle into their true values (exploitation) - helps exploration as well
+If you have not explored a bandit yet its high value will cause you to explore it more.
+
+    Greedy strategy only but with high initial means
+
+Usually performs better than epsilon greedy!
+
+####################################################
+####################################################
+#### UCB1 - Upper Confidence Bound ################
+
+Another way to solve the *explore-exploit* dilemma.
+Idea: confidence bounds. 
+Intuitively we know that a sample mean from 10 samples is less accurate than a sample mean from 1000 samples.
+
+ *Confidence bound*: how confident we are about the mean we have based on the collected samples
+
+Chernoff-Hoeffding bound: P(abs(X_mean - mean)>=eps) <= 2*exp(-2*pow(eps,2)*N)
+        Means that the confidence grows exponetially with the number of collected samples. 
+    What should epsilon be? 
+    Algorithm:
+    #############################################################
+        UCB(X_j) = mean(X_j) + pow((2 * math.log(N)/N_j) ,0.5) 
+    #############################################################
+        where N = number of times I played in total, N_j = number of times I played bandit j
+        UCB(X_j) is the Upper Confidence Bound
+    
+Upper Bound  ==>  Sample mean + some additional value to increase the bound (the nominator ln(N) grows slower than the denominator N_j so eventually all upper bound will shrink and we converge to a purely greedy strategy)
+
+We will be greedy based on the upper confidence bound. 
+How does it work? => If you played the other bandits a lot and j-th bandit just a few times then the ratio of log(N)/N_j will be large causing you to select the j-th bandit to play. If N_j is large then the UCB will shrink. After lots of plays since log(N) grows a lot slower than N_j the UCB will converge to the sample mean since the extra term will be so small. *** Will become a greedy strategy based on the sample mean after many games! ***
+
+    UCB Pseudocode:
+        for i in range(N):
+            j = argmax(bandit[j].mean + sqrt(2*ln(N)) / n_j )
+            pull bandit j
+            update bandit j
+
+        If N_j is zero then add a small number to the denominator.
+
+Outperforms epsilon greedy!
+
+
+
+######################################################
+######################################################
+##### Bayesian method ~ Thompson Sampling ############
+
+confidence interval again...
+sample mean from 10 sample is less accurate than 1000 samples
+confidence interval is approx Gaussian with true mean equal to expected value of the variable variance equal to original variance devided by N. 
+What if the expected value is also a random variable? 
+    Data is fixed and parameters are random. 
+
+** I want to find the distribution of the parameter given the data! **
+P(theta|X) <- posterior    Find should find the posterior in terms of the likelihood and the prior.
+    Disadvantage: we must choose the prior which effects the posterior
+    
+    Prior:      P(theta)
+    Posterior:  P(theta|X)    probability of the parameter theta given the evidence (D)
+    Likelihood: P(X|theta)    given the parameter, the likelihood of the given evidence to be observed
+
+Conjugate prior: https://en.wikipedia.org/wiki/Conjugate_prior
+    Beta distibution: two params: a, b
+    **************************************
+    *****Look at: ab_testing/demo.y ******
+    **************************************
+    from scipy.stats import beta
+    we start with a=1 and b=1 => it will mean a uniform distrubtion.
+    After many trials the tru mean will equal the estimated mean.
+    On the first trial the distrubiton of the number of success is very flat. It get skinnier as we get more and more confident after many trials. The distribution becomes more and more accurate after every coin toss since we learn more about the true distribution. => ONLINE LEARNING - iteratively improving. It can represent cofidence bounds.
+
+Application to the bandit problem:
+    - The key is SAMPLING
+    - Instead of upper confidence bound like in UCB1 we take the argmax of our samples of each bandit means
+        means are now probability distributions -> we can draw samples from them
+    Explore: 
+        - Not much data; distributions are fat; can sample high values: reason is that when the distibution is flat we still have a high chance to draw a high number as a sample - when distribution is more flat we encouraged to sample more often.
+    Exploit:
+        - Lots of data; distributions are skinny; will only sample near true mean: Since the distribution is skinny we become more confident in our estimates, we explore less and exploit more since the sample will always in a very narrow range
+    The Bayesian posterior automatically controls how much exploration/exploitation we do
+
+
+#####################################################################################################
+
+
+Explore/Exploit techniques:
+    - Epsilon-greedy
+    - Optimistic Initial Values
+    - UCB1
+    - Thompson sampling
+
+Modify epsilon with epsilon(t) = 1/t
+
+They all perform about the same so we will use Epsilon-greedy.
+**** Look at comparing_explore_exploit_methods.py  *******
+
+
+######################################################################################################
+
+
+##Nonstationary bandits##
+
+Stationary process: whose statistics do not change over time (e.g mean)
+Weak-sense stationary: mean (1st order) and autocovariance (2nd order statistics) do not change over time.
+Strong-sense stationary: entire PDF does not change over time. 
+
+Mean update: 
+    mean(X_t) = (1-1/t) * mean(X_t-1) + 1/t * X_t
+    Q_t = Q_t-1 - 1/t * (Q_t-1 - X_t) where Q_t = mean(X_t)    // rearranged from above
+    Q_t = Q_t-1 - alpha * (Q_t-1 - X_t)     // replaced 1/t with alpha
+
+    where aplha can be anything (even constant)! Looks like gradient descent
+    Deep learning part 2: adaptive learning rate used 1/t
+
+Low pass filter: Q_t = (1-alpha) * Q_t-1 + alpha*X_t
+
+    Get rid of recurrence: Q_t = alpha * sum(start=tau=0, end=t, pow(1-alpha, tau) * X_t-tau)
+    Q has an exponentially decaying dependence on X. => more emphasis on recent values.
+
+    Theano scan tutorial: folder: hmm_class, file: scan3.py
+
+Convergence criteria for Q:
+    Q will converge if:     sum(t=1, infinity, alpha(t)) = infinity
+    Q will NOT converge if: sum(t=1, infinity, pow(alpha(t), 2) ) < infinity
+    Constant alpha will not converge
+    1/t will converge
+
+    But IF the problem is non stationary we want constant alpha that does not converge.
+    In reinforcement learning we DO NOT want to calculate the sample mean over all collected samples.
+     - sum(t=1, inf, 1/t) converges, sum is infinity
+     - sum(t=1, inf, 1/pow(t,2)) DOES NOT converge, sum is not infity
+
+#######################################################################################################
+#######################################################################################################
+#######################################################################################################
+
+
+
+Section 3
+
+Tic-Tac-Toe
+-----------
+
+
+Components of a RL system
+-------------------------
+
+- Agent: thing that acts on the environment - we code intelligence into
+- Environment: thing Agent interacts with
+- State: specific configuration of the environment that the agent is sensing
+
+Agent is in a state_t and takes action_t that changes to environment to state_t+1 and receives a reward in the next state.
+Reward tells you how good your action was. It is a number.
+
+Notation:
+    S(t), A(t) -> R(t+1), S(t+1)
+
+4-tuple : (s,a,r,s')
+    - s: curr state
+    - a: action taken
+    - r: reward received after s + a, we receive it when we are already in next state (s')
+    - s': next state
+
+Terms:
+- Episode: One entire game. From start to finish. e.g tic tac to from empty board to 3in a row state
+    Our agent will learn across many episodes. 
+    The # of episodes played is a hyperparameter
+
+    Playing tic-tac-toe is episodic task because you play it again and again.
+
+    End of an episode: certain states are *terminal* states.
+   
+Rewards:
+    Us programmers are like coaches to the ai system. Or like a pet-owner.
+    
+    Example: Maze solving
+        1 for finding the exit, 0 if not  => this is a bad reward structure. Since the agent always just sees 0 so it will think that is the best he can do so it will just wander around.
+        Better => Every step yields a reward of -1 => encourages the robot to solve the maze quickly.
+
+    Caution: Do not your own prior knowledge into the AI. for instance chess robots have lots of expert info programmed into them.
+    Tell the agent WHAT you want to achieve(not HOW you want to achieve)!!
+
+Planning (Value function):
+---------
+
+We should not just consider immediate rewards but future rewards too.
+    Example: You will have an exam but instead you want to party with your friends which would be an immediate reward but if you fail the exam -> drop out of university -> homeless person in the future.
+
+    VALUE FUNCTION: We want to assign some value to the current state that reflects the future too. This is called value function. 
+
+Credit assignment problem: 
+-------------------------
+Example: You receive a reward - getting hired for a dream job. You ask the question - what action lead to this reward?
+What did I do in the past that led to the reward I am receiving now? 
+    
+    What action gets the credit?
+
+Examlple: Which advertisement lead you to buy a product? How do we assign the credit among many ads?
+                    - last click
+                    - linear (assign each ad the same credit)
+                    - time decay attribution (more recent gets more credit)
+    We are interested in the whole ad sequence and how that led to the reward.
+
+Delayed rewards
+---------------
+
+Credit assigment: present -> past
+Forward direction: present -> future
+This forward is what we call PLANNING!
+
+#################################################################################
+How is the action I am doing now effects the reward I am receiving in the future?
+#################################################################################
+
+The AI needs foresight or planning. 
+
+Example: Currently we are in State A and can get to B or C with both 0.5 prob. B rewards 1 C with 0. Noth are teminal.
+What is the value of State A? 0.5 * 1 + 0.5 * 0 = 0.5
+
+Value function: 
+    V(s) -> the value of the state (taking into account the prob of all future rewards)
+
+#################################################################################
+Value is a measure of possible future rewards we may get from being in this state!!!
+#################################################################################
+
+reward vs value function: reward is immediate
+
+Super Mario: jumping on  Goomba will immediately increase your score. Standing in front of a Goomba will not increase your score but will put you into a position to jump in the next few states.
+
+We choose to go to states based on the value of that state and not based on immediate reward. We can't guide actions based on rewards only since that does not tell us about future rewards.
+
+Efficiency of value function:
+-----------------------------
+
+Calculating all state transitions and their prob of occuring can be exponentially growing. That is why we have the value function since we dont need to do that. Searching the state space only works in very small games.
+Value function is O(1) gives answer how well you will do from the current state. 
+
+How do we find the value function??
+
+Estimating the value function is central task in RL.
+-----------------------------
+
+V(s) = E[all future rewards | S(t)=s]
+E[X] = average of x
+
+
+Generic algorithm to find value function
+----------------------------------------
+
+- Iterative algorithm
+- Init V(s):
+    - V(s) = 1 if s == winning state
+    - V(s) = 0 if s == lose or draw
+    - V(s) = 0.5 otherwise
+            V(s) -> probabilty of winning after arriving to state s.
+- Loop: V(s) <- V(s) + alpha*(V(s') - V(s)) where
+            - s  : current state
+            - s' : next state
+s is all the states we encountered during an episode. For each iteration of the loop we need to play the game and remember all the states we were in. Then we loop through each state in the state history and update the value. using the above equation.
+Aboe means we need to play an episode and keep track of the state history. We do this over many episodes. 
+
+for t in range(max_iteration):
+    state_history = play_game()
+    s = state_history[0]
+    for s' in state_history[1:]:
+        V(s) = V(s) + learning_rate * (V(s') - V(s))
+        s = s'
+
+How do we play the game ( play_game() ):
+    
+    Take random actions? No! We dont have to since we have the value function.
+
+def play_game():
+    maxV = 0
+    maxA = None
+    for a, s' in possible_next_states:
+        if V(s') > maxV:
+            maxV = V(s')
+            maxA = a
+    perform_action(maxA)    
+
+Problem: Value function isn't accurate. Of course since if we had the true value function we would not need to do all of this work.
+This is an instance of the epsilon-greedy dilemma. Random actions lead us to states we may not have otherwise visited, this is so we can improve our value estimates for those states.
+But to Win => we need to do the action that yields the maximum value. So there is the tradeoff of exploration of lesser known states and exploitation of known good states.
+We will sue //epsilon-greedy//!!!
+
+V(s) <- V(s) + alpha * (V(s') - V(s))
+V(s') is the target value and we want to move V(s) towards V(s')
+But there multiple next states so multiple V(s')-s.
+
+By playing infinitely many episodes the proportion of time we spend in each s' will approach the true probabilities.
+V(terminal) = 0 or 1
+We want to move backwards through the state history since the current state value is always updated using the next state value.
+
+Summary:
+--------
+- Credit assignment problem: An action might lead to a reward many step ahead.
+- Value function -> represents future rewards
+- Value function efficienct vs searching game tree
+- Iterative algorithm to find the value function
+
+
+
+Tic-Tac-Toe     tic_tac_toe.py
+-----------
+
+Outline:
+    Agent
+             play_game()          
+                <==>      Environment
+    Agent          
+
+play_game(p1,p2,env)
+
+Two agent and both interact with the same environment.
+
+Represent each board state with a single number so we can use that for hashing. There are 9 tiles on the board and each tile can take 3 values(Empty, 1, 0) so we have 3**9 states. We can use 3 number system to convert a setting to a number.
+    # we are in the 3 number system -> h = 3**n-1 * b_n-1 * ... 3**2 * b_2 + * 3**1 * b_1 + 3**0 * b_0 
+
+How do we enumerate the game states? 
+    - ## GAME TREE ##? Problem -> Redundant states
+        The same state appears more than once in the tree. 
+        Start: 9 choices
+        Then:  8 choices
+        Then:  7 choices
+
+        9! = 362 880 >> 3**9
+
+        It is because the same state configuration will can end up many times during the tree. Lots of redundancy.
+
+    - PERMUTAIONS: This is what we should use instead! Recursive problem since:
+            permutation(n) = for prefix in (0,1) + (suffix for suffix in permutation(n-1))
+
+    ### base case is emmited here for simplicity
+    def generate_all_binary_numbers(N):
+        # N: len of the number
+        results = []
+        child_results = generate_all_binary_numbers(N-1)
+        for prefix in ('0', '1'):
+            for suffix in child_results:
+                new_result = prefix + suffix
+                results.append(new_result)
+        return results
+         
+Agent:
+    - Contains the AI
+    - different from supervised learning as you do not just simply feed in the data
+    - it has to interact with the environment
+    - one line updates
+
+Summary of tic-tac-toe:
+    - Agent, environment, state, action, reward
+                          (s, a, r)
+
+Reward are delayed but the VALUE FUNCTION has the future 'built' into it. 
+Rewards can have some randomness in them. In some states sometimes we get 1 or 0.
+
+In RL we are never told if an state-action pair is good or not. The only way to know is to peform the action in the state and see what reward we get. 
+
+RL is **ONLINE** -> We learn as we play. After each episode the agent gets better. If you wnt to incoroprate new data -> start playing again.
+
+
+#####################################################################################################################
+
+GRID WORLD
+----------
+
+Sequence: (x_1,x_2,...,x_t)
+
+P(x_t|x_t-1, x_t-2,..x_1)
+
+First-order Markov:  P(x_t|x_t-1,x_t-2,...,x_1) = P(x_t|x_t-1)
+Second-order Markov: P(x_t|x_t-1,x_t-2,...,x_1) = P(x_t|x_t-1, x_t-2)
+
+Markov property: How many previous values the current value depend on?
+
+Markov property in RL:
+    { S(t), A(t) } produces -> { S(t+1), R(t+1) }
+    Markov property:
+        P(S_t+1, R_t+1|S_t,A_t, S_t-1,A_t-1,...,S_0,A_0) = P(S_t+1, R+t+1|S_t,A_t)
+
+    notation: p(s',r|s,a)
+        Joint on s' and r, conditioned on both s and a
+
+Assumption:
+    - state will bring the same reward always
+    - action will bring the same state
+   
+        p(s'|s,a) = sum[P(s',r|s,a) for r in all_rewards]   <-- state transition prob
+        p(r |s,a) = sum[P(s',r|s,a) for s' in all_states]   <-- reward prob
+
+
+
+##########################################################################################################################
+##########################################################################################################################
+##########################################################################################################################
+
+
+
+Section 4
+ 
+Markov Decision Process
+-----------------------
+
+    - set of states
+    - set of actions
+    - set of rewards
+    - state-transition and reward prob (as defined above)
+    - discount factor
+
+    Often written as a 5-tuple
+
+    **Policy**
+        Notation: pi
+        Technically not part of the MDP but along with the VALUE FUNCTION + POLICY form the solution
+        
+        What is means?? pi a shorthand for the *algorithm* that the agent is using to navigate the environment.
+
+State-transition probability: p(s'|s,a)
+    State sensed by the agent might not be the same as the environment!! state can be in imperfect representation of the environment. Because of this there is stochasticity in it.
+        Example: BlackJack - you are the agent - the dealer next card is not part of your state but it of the environment
+        
+ Total reward: 
+    - total future reward from t+1 -> **return** G(t) - does not count R(t)
+                    G(t) = sum(tau=1, inf, R(t+tau))
+        
+Future reward: does it worth more to get the reward now or in the future? would you rather get $1000 now or in 100 years in the future? -->
+        --> ### DISCOUNT FACTOR ### of future rewards
+    
+            Need to discount future rewards! 
+                    Gamma=1 -> does not matter when I receive -> no discounting
+                    Gamma=0 -> truly greedy, only tries to maximize immediate reward
+
+                Usually we choose something close to 1, like 0.9
+                Short episodic task -> no discounting
+                But the discounting will be exponential on the time. the further we look into the future, the more discounting we do.
+            
+          ####################################################
+          # G(t) = sum(tau=0, inf, gamma**tau * R(t+tau+1) ) #
+          ####################################################
+                                                  
+##############################
+VALUE FUNCTION               
+--------------
+    - Value function is determined by policy and has state s as a parameter
+    - Only future rewards
+    - Value of all terminal states is 0 since there will be no more future rewards
+
+V_pi(s) = E_pi[G(t) | S_t=s] = E_pi[ sum(tau=0,inf, gamma**tau*R(t+tau+1)) | S_t=s]
+
+V_pi(s) = E_pi[R(t+1) + gamma*G(t+1) | S_t=s] 
+
+#################################################################
+Policy: Probability of doing an action given we are in state s. #
+        pi = pi(a|s)                                            #
+#################################################################
+
+    E_pi[R(t+1) | S_t=s] = sum([ pi(a|s)*sum([r*p(r|s,a) for r in rewards ])  for a in actions])
+
+    Two stochastic variables: 
+            - Given state s what action a we will do
+            - Given action a and state s what reward we will get
+
+        Both of the above prob distribution are needed to get the expected value of the reward given state s.
+
+    We can do this not just for the next reward but also for the value function value.
+
+    
+    Bellman Equation
+    ----------------
+
+        Richard Bellman
+        Pioneered dynamic programming. Bottom up approach. Dynamic programming is also one of the solutions for MDPs.
+        
+        V_pi(s) = sum( pi(a|s) * sum(sum( p(s',r|s,a)*(r+gamma*V_pi(s')) for r in rewards ) for s' in states)  for a in actions )
+
+       The prob of state s' and reward r, given state s, and action a multiplied by the discounted value of the next state s' + r. It is required to know V(s') before calculating V(s) if doing the bottom-up approach.
+
+
+Two types of value functions:
+---------
+     - State-value function:  V_pi(s) = E_pi[G(t)|S_t=t]                (Value given state)
+     - Action-value function: V_pi(s,a) = E_pi[G(t)|S_t=s, A_t=a]       (Value given action)
+            - Space required is quadratic: space x actions - set of space times set of actions
+
+
+
+Optimal Policies & Optimal Value Functions
+----------------   -----------------------
+
+Relative 'goodness' of different policies. 
+    
+        pi_1 >= pi_2 if V_pi_1(s) >= V_pi_2(s) for all s in all_states
+
+            Policy 1 is better than policy 2 if the expected return of pi_1 is greater than or equal to than the expected return of pi_2 for all states.
+
+    Optimal state-value function:
+    ----------------------
+            V*(s) = max(V_pi(s) for pi in all_pi)  for s in all_states
+                    Max of the value function over all policies.                        
+
+    Optimal Action-value function:
+    -----------------------------
+            Q*(s,a) = max(Q_pi(s,a) for pi in all_pi)  for s in all_states && for a in all_actions
+                        Max of the action-value function over all policies. 
+    
+            Q*(s,a) = E[R(t+1) + gamma * V*(S_t+1) | S_t=s, A_t=a]
+    
+    Relationship between Q and V:
+            To find best action we must find the best V(s) - (state-value function)
+
+                V*(s) = max( Q*(s,a) for a in all_actions )
+
+    Bellman Optimality Equation:
+    ---------------------------
+        
+        state-value optimality function:
+        -----------
+        V*(s) = max( E[R(t+1) + gamma * V*(S_t+1)) | S_t=s, A_t=a ] for a in all_actions )
+
+        action-value optimality function:
+        -----------
+        Q*(s) = E[R(t+1) + gamma * max(Q*(S_t+1,a') for a' in all_actions) | S_t=s, A_t=a]
+
+
+Value function includes all future rewards already. Just greedily choose the action that yields the best next state value V(s'). We need to try each action and see which action gives the biggset V(s') and choose that. But if we have Q(s,a) we don't have to do this since it caches the look-ahead search results.
+
+
+MDP Summary:
+-----------
+
+    - Policies
+    - Returns - total future rewards
+    - Discounting future rewards with discount rate gamma
+    - ## State-value  ## function
+    - ## Action-value ## function
+    - Bellman Equation: 
+            Recursively defines the value function in terms of the value function in the next state
+    - Bellman Optimality Equation: 
+            Optimal state-value function
+            Optimal action-value function
+            Recursively define the optimal value functions through the optimal value functions at the next state:
+                                                                - Bellman Optimality Equations
+                                    V*(s) = E[R(t+1) + gamma * V*(S_t+1) | S_t=s, A_t=a]
+    
+###########################################################################################################
+###########################################################################################################
+###########################################################################################################
+
+
+
+
+Section 5
+
+Dynamic Programming
+-------------------
+
+    - Useful for MDP solutions.
+    - Centerpiece of MDP: The Bellman Equation
+    - Linear equation -> |S| equations, |S| unknowns
+        but many entries will be 0 since of s -> s' is sparse (from most states you can only go to few other states)
+                        ||
+                        ||  - use iterative poliy evaluation instead
+                        \/
+
+    Iterative policy evaluation  - evaluation policies
+    ---------------------------
+        We appy the Bellam equation again and again and eventually it will converge        
+        
+        """
+        input:  policy 'pi'
+        output: value function V(s) for this policy 'pi'
+        we init the value function value zero for all states and delta will determine the change and use it to determine when to quit
+
+        it is defined where V(s) at 
+        """
+        def iterative_policy_evaluation(pi):
+            initialize V(s) = 0 for s in all_states
+            while True:
+                delta = 0
+                for s in all_states:
+                    old_v = V(s)
+                    V(s) = Bellman Equation
+                    delta = max(delta, abs(V(s) - old_v))
+                if delta < threshold:
+                    break
+            
+            return V(s)    
+        
+        Value at iteration at k+1 depends on iteration k+1 in the Bellman equation
+    
+       
+    Finding V(s) given a policy is => ## prediction problem ##
+    Finding the optimal policy is =>  ## control problem ##
+                --------------
+
+            #####################   ##################### 
+            # Control Problem #      # Prediction Problem #          
+            #####################   #####################
+
+Grid world - grid_world.py
+----------
+
+Iterative policy evaluation:
+----------------------------
+
+ - Completely random policy:
+              ------
+
+        Uniform Random policy: pi(a|s) = 1/|A(s)|
+        A(s) = set of possible actions from state s
+        p(s',r|s,a) is only relevant when the state transitions themselves are random(i.e. you try to move left but you end up moving right)
+ 
+ -  Completely deterministic policy:
+               -------------                                                                                                 
+       We set up the rules beforehand. What action to take with 100% if we are in a given state.
+
+#################
+Control problem #
+#################
+
+Improve current policy by examining the other actions and if an action in a given state is better(higher Q value) then update the policy with that.
+Pick an action that gives maximum Q. 
+
+If we have Q:    pi'(s) = argmax(Q_pi(s,a) for a in actions )
+If we have V:    pi'(s) = argmax(sum( P(s',r | s,a) * (r + gamma * V_pi(s')) )  for a in actions )
+
+We are just looking at the current state and pickig the best action based on the value function at that state.
+How do we know when we are finished improving? When we found the optimal policy the poliy wont change in rspect of the value function. The V(s) will not further improve - stays constant.
+
+    Problem: if we change the policy the value function becomes out of date. -> we should recalculate the value function.
+        Iterative Policy Improvement:
+                    - Policy evaluation     } --    
+                    - Policy improvement    } -- Alternates between the two
+            Keep doing until policy does not improve anymore.
+
+Policy Iteration  - policy_iteration.py
+-----------------
+
+Step 1. randomly initialize V(s) and the policy pi(s)
+
+Step 2. V(s) = iterative_policy_evaluation(pi)  -- Policy evaluation
+
+Step 3.:  Policy improvement
+          ------------------
+        policy_changed = False
+        for s in all_states:
+            old_a = policy(s)
+            policy(s) = argmax( sum( P(s',r | s, a) * (r + gamma*V(s')) ) for a in all_actions )
+            if policy(s)!=old_a:
+                policy_changed = True
+        if policy_changed:
+            goto Step 2.
+
+
+Windy gridworld  - policy_iteration_random.py
+---------------
+    2 prob distributions:
+        - pi(a|s)       Given s what action we do
+        - p(s',r|s,a)   Given state and an action what reward we et and what state we will end up in
+
+        p(s',r|s,a) might not be determenistic!
+        It is not in windy gridworld!
+
+Example: Taking an action in a state has diff probs to end up in diff states.
+
+
+Value iteration
+---------------
+
+Alternative technique to solve the control problem.
+                                   ----------------
+Previous technique was policy iteration which had one iterative algo inside another. 
+        while can_not_improve_anymore == False:
+            policy_evaluation;  # ends when V converges
+            policy_improvement; 
+
+Do we need to wait until v converges? Not always changes the policy after a certain point.
+The policy_improvement step would find the same policy so no need to do more iteration.
+
+    Combines policy eval and pol improvement into one step:
+        
+    V_k+1(s) = max(sum( sum(P(s',r|s,a)*(r + gamma*V_k(s')) for r in rewards) for s' in states)  for a in actions )
+                                                                                                    ------------                                        
+    We are taking the maximum over all possible actions!
+
+for s in all_states:
+    V(s) = 0
+
+while True:
+    delta = 0
+    for s in all_states:
+        old_v = V(s)
+        V(s) = max(sum( sum(P(s',r|s,a)*(r + gamma*V_k(s')) for r in rewards) for s' in states)  for a in actions )
+        delta = max(delta, |V(s) - old_v|)
+    if delta < threshold:
+        break
+
+for s in all_states:
+    pi(s) = argmax( sum( sum(P(s',r|s,a) for r in rewards ) for s' in states )  for a in actions ) 
+       
+
+Summary to Dynamic Prog:
+------------------------
+
+Markov Decision Process - one solution is -> dynamic programming
+#########################################################
+Prediction problem : Iterative Policy Evaluation        #
+Control problem    : Policy iteration, Value iteration  #
+        - finding the optimal policy
+        - finding optimal value function
+#########################################################
+
+
+For more realistic games we can not just simply loop through all possible states! There could be enourmous amounts of states.
+Thus even one iteration could take very long.
+
+Asyncrounous DP
+---------------
+Asyncronous Dynamic programming: instead o looping through all states just loop through a few or only one - choose based on the most visited states: can be learned by playing the game!
+
+Policy iteration - policy(what action to take in a given state)
+----------------
+    We alternate between two steps:
+        - Evaluating of the policy
+        - Improving(changing) the policy
+    
+    Initialy the policy and the value function can be highly suboptimal. But by requiring the policy to be greedy with respect to the value function we can converge to the optimal policy and the optimal value function.
+
+    Brute-force search:
+    ------------------
+        # states = N
+        # actions = M
+        There are O(N) states to traverse from goal to end state. There are M actions possible in each state.
+        We want to explore action-sequences of length O(n).
+        M * M * ... * M = M**N possible permutations, state sequences and do policy evaluation on all of them.
+        then you keep the policy that gives you the maximum value function.
+       
+    Dynamic Programming is much more efficient! - value_iteration.py
+
+Model-based vs Model free
+-------------------------
+DP requires full model of the environment! P(s',r|s,a)
+In real world it is hard to measure if the |S| is large.
+Remaining section will look at methods which do not require such a model - model free methods
+
+We also do an initial estimate of the V(s) - called BOOTSTRAPPING
+                                                    -------------
+        - Monte Carlo method does not require bootsrapping
+        - Temporal Difference (TD) learning does
+
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+
+
+
+Section 6
+
+Monte Carlo methods
+-------------------
+
+RL is all about learning from experience. 
+So far we always had a full model of the environment, including P(s',r|s,a)
+In dynamic programming approach we have not played a game - with self driving cars of video games - can I just so simply set the state of the agent? So far we were able on these board games but we can not do it on all environments.
+We usually do not have God-mode capabilities!
+
+MC methods learn purely from experience!
+
+- Monte Carlo methods always have a big random component.
+- Random component is RL is the *return*!
+- With MC instead of calculating the true expected value of G(that requires prob distributions) -> we calculate its sample mean!
+                                                                                                   -----------------------------
+- Need to assume episodic tasks only
+                 -------------------
+- Episode must terminate before we calculate returns!!!
+- Not fully online since we must wait for the entire episode to finish before updating!
+  ----------------
+
+Similar to the multi armed bandit problem -> average reward after every action
+MDP: average the return
+MC-MDP: every state is a separate multi-armed bandit problem. We try to learn how to behave optimally for every multiarmed bandit problem.
+
+Facing the same issues as with DP:
+    - Prediction problem (finding value given policy)
+    - Control problem (finding optimal policy)
+
+#########################
+V_pi(s) = E[G(t)|S_t=t] #   ==> Estimated by: V_pi(s) = 1/N * sum(G(i,s) for i in range(N))   where i=episode and s=state
+#########################
+
+How do we generate G?
+
+- Just play a bunch of episodes and log the states and rewards sequences
+        s1 s2 s3 ... sT
+        r1 r2 r3 ... rT
+- Calculate G from definition
+        G(t) = r(t+1) + gamma * G(t+1)
+    
+    - Calculate G by iterating through states in reverse order
+    - Once we have (s, G) pairs average them for each s
+
+Question: What if you see the same state more than once in an episode? 
+                for instance we see s at t=1 and t=3
+                  Which return should we use? 
+                    - First visit method: use t=1 only
+                    - Every visit method: both t=1 and t=3 as samples
+            
+                It does not matter! Both lead to the same answer! It has been proven!
+
+First visit MC pseudocode:
+
+def first_visit_monte_carlo_prediction(pi, N):
+    V = random_initialization
+    all_returns = {}
+    do N times:
+        states, returns = play_episode()            # monte_carlo.py: play_game()
+        for s, g in zip(states, returns):
+            if not seen s in this episode yet:
+                all_returns[s].append(g)
+                V(s) = sample_mean(all_returns[s])  # could use the previous mean to calculate the new mean, 
+                                                    # or moving avg if non stationary
+    return V
+
+Central limit theorem still applies - we are going to be more confident in values that have more samples
+
+Code: monte_carlo.py
+
+Calculating returns from rewards:
+---------------------------------
+
+s = grid.current_state()
+states_and_rewards = [(s,0)]
+while not game_over:
+    a = policy(s)   # take the current action
+    r = grid.move(a)  # apply action
+    s = grid.current_state()    # new state
+    states_and_rewards.append((s,r))    # add achieved new state, reward
+
+# now calculate the G-s from backwards - since we need the next G value to compute the current one G(t) = r(t+1) + gamma*G(t+1)
+G = 0
+states_and_rewards = []
+for s, r in reverse(states_and_rewards):
+    states_and_returns.append((s,G))
+    G = r + gamma*G
+states_and_rewards.reverse()
+
+
+Monte-Carlo only needs to update and deal with states that it visited - dynamic programming needed to loop through all states (big disadvantage)
+We don't even know what states there are we just discover them as we play! When full precise calculation is infiesible MC is very useful.                        
+
+
+Windy gridworld policy evaluation - Code: monte_carlo_random.py
+---------------------------------
+
+
+Windy gridworld - different policy
+In windy gridworld P(s',r|s,a) NOT DETERMINISTIC
+                   ----------------------------- 
+    State transitions are not deterministic!
+    Randomness -> need for monte-carlo
+
+
+
+
+Monte Carlo for Control Problem (How to find the optimal policy)
+----------      ---------------
+
+How to find the optimal policy with Monte Carlo?
+Problem: We only have V(s) for a given policy. We don't know what actions will lead to a better V(s) because we can't do a look ahead search.
+
+All we could do so far play an episode with the given policy and get states/returns.
+
+We should find Q(s,a)!! Then we can choose argmax[a]{Q(s,a)} == choose the action that maximizies the Q on a given s.
+
+Problem with Q(s,a) is that  now we need |S|x|A| estimates -> many more iterations are needed.
+Also if we have a fixed policy than we only do one action per state so we do not explre our other options.
+We only able to fill in one out of |A| values.
+            ||
+            \/
+        We can solve it by choosing a random initial state and a random initial action
+                                      --------------------       ---------------------
+        After that we just follow the policy.
+        Q_pi(s,a) = E_pi[G(t) | S_t=s, A_t=a]
+
+Control problem: (finding optimal policy)
+---------------------------------------------------------------------
+ ___________________________________________________________________
+|                                                                   |
+|    do:                                                            |
+|        policy_evaluation()       #  find Q(s) values              |
+|        policy_improvement()      #  pi(s) = argmax[a]{Q(s,a)}     |
+|    while not converged                                            |
+|___________________________________________________________________|
+
+
+Problems with MC:
+----------------
+    - time complexity iterative algo inside another iterative algo
+    - for Q we need a lot of samples
+
+        ||
+        \/
+     Solution:  Code: monte_carlo_es.py   -  es - Explore Starts
+     ---------
+            - #Do not# start a fresh MC evaluation on each round (would take too long to collect samples)
+            - Instead just #keep updating the same Q#
+            - Do policy_improvement after every episode -> #generate only one episode per iteration#
+
+    pseudocode:
+Q  = random
+pi = random
+
+while True:
+    s, a = randomly select from S and A         # explore and starts method - when we randomly choose a starting state and action
+    states_actions_returns = play_game(start=(s,a))
+    for s,a,G in states_actions_returns:
+        returns(s,a).append(G)
+        Q(s,a) = average(returns(s,a))
+    for s in states:
+        pi(s) = argmax[a]{ Q(s,a) }
+
+
+MC Control(finding optimal policy) without ES(explore starts) - Code: monte_carlo_no_es.py
+-------------------------------------------------------------
+        
+Disadvantage of previous control method: needs exploring starts
+ES requires "God mode"
+For instance self driving car we can not employ ES
+We need to remove the need for ES
+
+How to use MC without ES?
+-------------------------
+
+    Let's not be simply greedy but epsilon-greedy!
+                                   --------------
+
+    Code modification:
+        - remove ES - explore stats
+       # ###################################################################################################################################
+       # - change policy to be sometimes random - instead of greedily following the policy with a small epsilon prob we do a random action #
+       # ###################################################################################################################################
+    
+    Epsilon-soft (Epsilon-greedy):
+    ++++++++++++
+        We want a lower limit for every action to be selected:
+                pi(a|s) >= epsilon / |A| , any a in A(s)
+
+            Also use epsilon to decide if we want to explore:
+                a* = argmax[a]{Q(s,a)}      # best action so far
+                pi(a|s) = 1 - epsilon + epsilon/|A(s)|  if a = a*
+                        =               epsilon/|A(s)|  if a != a*
+
+    
+Monte Carlo Summary
+===================
+
+    In last section, DP we never played the game because we assumed that we knew all the state transition probablities - this is not very likely in real world!
+    With MC --> Learned from experience!
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    Main idea: Approximate the expected return with sample mean +
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    V_pi(s) = E[G(t)|S_t=s]
+    V_estimated_pi(s) = 1/N * sum(G(i,s) for i in range(1,N))
+
+    MC vs DP:
+    ---------
+        MC can be more efficient since we don't have to loop through all states BUT we some states will never be reached or reached very rarely so we might not get the full value function
+        Hence! -> + More data ==> More Accuracy +   The more times we reach a given state the more accurate the value function will become.
+                  +++++++++++++++++++++++++++++++
+        
+        We can use ES to randomly start from new position and action so we can traverse different paths.
+
+    MC Control:
+    +++++++++++
+        Use Q instead of V. Value of an action/state pair. Monte Carlo needs many samples in order to be acccurate.
+        Also one optimization we can do is to calculate the mean on Q(s,a) from many policies. Still converges - never been formally proven why is that.
+        Also it is not necessary to use explore and starts method we can just use epsilon greedy - have a small chance of doing a different action than what we intended to do - just like with the multi armed bandit problem.
+        It is like having a single multi armed bandit problem at each state.
+
+
+
+###########################################################################################################################
+###########################################################################################################################
+###########################################################################################################################
+
+
+
+
+Section 7
+
+------------------------------
+Temporal Difference Learning |
+------------------------------
+
+    - 3rd way of solving MDP (so far DP, MC) and now TD!
+
+    -----------------------------
+    | TD == Temporal Difference |
+    -----------------------------
+
+    Combines the ideas of DP and MC. Disadvantage of DP: never learns from experience - requires full model of the environment
+    MC and TD learns from experience.
+    MC can only update after completing a full episode but DP uses bootstrapping. 
+
+    TD uses: 
+        - bootstrapping of initial values
+        - fully online - can update during an episode!!
+          ------------              ------
+
+    Note: TD learning is one of the most important techniques in reinforcement learning!
+
+Approach:
+    - prediction problem: find the value function V(s) given the policy pi
+    - control problem:    improve/change the policy
+
+-------------------------
+Two control methods:    |
+                        |
+    - SARSA             |
+                        |
+    - Q-learning        |
+                        |
+-------------------------
+
+
+ Prediction problem with TD (finding the value function V(s))
+ ------------------------------------------------------------
+
+    Algorithm is called: TD(0) - there are other ones like TD(1), TD(lambda) but we do not bother with them in this course
+                         ----
+    
+    V(s) = E[G(t)|S_t=s] = E[R(t+1) + gamma*V(S_t+1) | S_t=s]       # expected value of the return given a state - defined recursively
+
+    --------------------------------------------------------------
+    V(S_t) = V(S_t) + alpha*[R(t+1) + gamma*V(S_t+1) - V(S_t)]   |
+    V(s)   = V(s) + alpha*[r + gamma*V(s') - V(s)]               |   This is TD(0) !!!
+    --------------------------------------------------------------
+
+            Why is it fully online? We can update V(s) as soon as we know s'
+
+    We are not calculating G here instead we are just using another V(S_t+1) estimate. We can not update V(s) until we know V(s').
+    We do not have to wait for the whole episode the finish we can just update the value for the current state.
+
+    Source of randomness:   With MC due to the stochastic policy or stochastic state transitions. 
+                            With TD(0) we have another source of randomness:
+                                - r + gamma*V(s') is an estimate of G
+
+Summary of TD(0):
+-----------------
+    - no need for model of the environment - only update V for states we visit (unlike DP)
+    - no need to wait for an episode to finish (unlike MC)
+    - advantageous for very long episodes
+    - good for non episodic-continouos tasks
+
+
+Code: td0_prediction.py
+
+
+TD Learning for Control (to actually make improvements to the policy)
+------------------------
+
+    - Apply TD(0) to control
+
+Method:    
+    - TD(0) for prediction
+    - policy improvement using greedy action selection
+    - value iteration method: update Q in-place, improve policy after every change
+    - skip the full policy evaluation part - we know it is not required anymore
+
+
+SARSA - (s,a,r,s',a')
+-----
+    
+We want to use Q since it is indexed by the action a too not just the state s like V.
+We need lots of samples to converge since Q is indexed both by state and action! Just like the case with MC.
+
+--------------------------------------
+Requires the 5 tuple : (s,a,r,s',a') |
+--------------------------------------
+
+-------------------------------------------------------------------------------------
+Q(S_t, A_t) = Q(S_t,A_t) + alpha*[R(t+1) + gamma*Q(S_t+1, A_t+1) - Q(S_t, A_t)]     |
+Q(s,a)      = Q(s,a) + alpha*[r + gamma*Q(s',a') - Q(s,a)]                          |
+-------------------------------------------------------------------------------------
+  
+We can not just follow a determinictic policy as that would leave most Q's untouched.
+    Use Explore Starts (ES) or policy that includes exploration --> we will use epsilon greedy! (Es is not realistic!)
+
+Pseudocode:
+----------
+
+Q(s,a) = arbitrary, Q(terminal, a) = 0
+for t=1..N:
+    s = start_state
+    a = epsilon_greedy_from(Q(s))
+    while not game_over:    # this loop runs until episode is over
+        s', r = do_action(a)
+        a' = epsilon_greedy_from(Q(s'))
+        Q(s,a) = Q(s,a) + alpha*[r + gamma*Q(s',a') - Q(s,a)]       # we update Q even during the episode - no need to wait for end of it!
+        s = s', a = a'
+
+
+Note: Convergence proof has never been published. SARSA seems to converge if the policy converges to a greedy policy. One way to achieve this is to let epsilon = 1/t
+instead of epsilon=1/t you can have c/t where c is a constant like (0.5) and t represents time. You can also have epsilon = c/t**a (like 0.5/t**(2/3))
+(Hyperparameter tuning)
+
+Learning rate alpha can also decay, no need to stay constant. Problem with this is that this decayed learning rate will affect Q-s that have never been seen before.
+-------------
+
+Learning rate
+-------------
+______________________________________________________________________________________________________________________________________________________
+To solve this we can get inspiration from deep learning. 
+
+    - AdaGrad, RMSprop (adaptive learning rates)
+    - learning rate decays more when previous gradient has been larger (the more it has changed in the past the less it will change in the future)
+ 
+Simpler version is to keep a count of every (s,a) pair seen so far => alpha(s,a) = alpha_0/count(s,a)
+
+                    alpha(s,a) = alpha_0/(k + m*count(s,a))  Each (s,a) will have its own decaying learning rate 
+_______________________________________________________________________________________________________________________________________________________
+
+
+Code: sarsa.py  
+
+
+
+#######################################################################################################################################
+
+#######################################################################################################################################
+
+
+
+
+Q-learning 
+----------
+
+
+Deviates from the strategies we have been taking so far. 
+
+Main theme before: generalized policy iteration
+        
+        - evaluation of policy
+        - improvement of policy (choosing an action greedily based on the current value estimate)
+
+                    ||
+                    \/   they are called on-policy methods
+
+We have been studying so far on-policy methods. We are playing the game using the current best policy.
+                             ---------
+
+We always followed the current best policy.
+
+  -----------------------------------
+  | Q-learning is off-policy method |   ==> we can do any random action and still find Q* (optimal policy)
+  -----------------------------------
+
+
+Similar to SARSA. They look astonishingly similar. 
+
+Instead of choosing a' based on the argmax of Q we instead update Q based on the max over all actions.
+    We update Q(s,a) with max over Q(s',a')
+
+But Q-learning is off-policy:
+    - no need to do a' as next action ==> we use Q(s',a') when updating Q(s,a) even if we do not do a' as next move
+    - does not matter what policy we follow, we can choose actions randomly and still get optimal result
+
+    BUT: random actions -> suboptimal -> takes longer for episode to finish
+
+    ----------------------------------------
+    || DOES NOT MATTER WHAT POLICY WE USE ||
+    ----------------------------------------
+
+If the policy you use during Q-learning is a greedy policy - meaning always choose the argmax over Q then Q(s',a') will correspond to the next action you will take.
+So in that case it will be also SARSA.
+
+---------------------
+Code: q_learning.py |
+---------------------
+
+
+Temporal Difference Summary:
+----------------------------
+
+    - Combines aspects of MC and DP
+        - MC: learn from experience/play the game
+    - Idea of taking sample mean of returns: multi-armed bandit
+    - MC is not fully online
+    - DP: bootstrapping, recursive form of value function to estimate the return
+                    ||
+                    \/
+
+                   TD(0) combines these ideas. 
+
+    Instead of taking sample mean of returns - we take sample mean of estimated returns which is based on the current reward r and the next state value V(s')
+
+
+    Control problem: we need to use the action-value function (Q(s,a)) instead of the state-value function (V(s))
+
+    - ON-POLICY:  SARSA     --> value iteration and TD(0)  - every algo so far has been on-policy
+    - OFF-POLICY: Q-learning   -> popular due to deep Q-learning
+
+    Disadvantages:
+    --------------
+        - Need for Q(s,a)
+        - state space can become infeasible to enumerate, and we also need to enumarate every action for every state
+        - Q may not even fit into memory due to the above state/action spaces
+        - Measuring Q(s,a) for all s, a is called the tabular method
+                        
+            #########################################################################################################################################
+
+                Storing all Q elements is impossible most of the time!!! We need approximation methods to compress the space requirements of Q      #
+                                                                                 ---------------------
+                        SOLUTION: FUNCTION APPROXIMATION of Q(s,a)
+
+##########################################################################################################################################
+                    
+
+####################################################################################################################
+####################################################################################################################
+####################################################################################################################
+
+
+
+Section 8
+
+
+Approximation methods
+---------------------
+
+Major problem with the methods so far that each require us to estimate the V(s) for each state s
+
+V(s) -   need to estimate |S| values
+Q(s,a) - need to estimate |S|x|A| values
+|S| and |A| can be very large
+
+
+Solution: Approximation
+          -------------
+
+Neural networks are universal function approximators.
+---------------
+
+  - Step 1: feature extraction, convert state s to feature vector x,   x = phi(s)
+  - Step 2: we want a function f(x, theta) === V(s)         # === means approximate, theta - set of parameters
+                                                            # estimates V(S) - value function
+
+Given the right architecure a neural network can approximate any fuction to a given accuracy.
+They do not perform perfectly but very well.
+
+
+
+Linear approximation
+--------------------
+
+    - differentiable models are required
+    - linear regression
+    - gradien descent
+
+
+Linear models:
+    - supervised learning aka function approximation
+    - we are tryingn to approximate V(s) or Q(s,a)
+
+    - Rewards are real numbers
+    - Returns(sums of rewards) are real numbers
+    - Value functions are expected returns -> are real numbers
+    
+    2 supervised learning techniques:
+        - classification
+        - regression
+        
+    We are doing regression.
+                 ----------
+
+Supervised learning methods have cost functions  -> the ERROR
+                                 --------------
+    Regression cost function: squared error, squared diff between V and estimate of V
+                            Error = ( V(s) - V_est(s) ) ** 2
+
+                            Error = [ E[G(t)|S_t=s] - V_est(s) ] ** 2
+
+              Replace V with its definition. But we do not know this expected value.
+    As we learned from MC we can replace it with its sample mean.
+                
+                            Error = [ 1/N * sum(G(i,s) for i in N) - V_est(s) ] ** 2
+
+  We can also treat each G(i,s) as a training sample. Then try to minimize all the individual squared diff's simultaneously.
+
+                            Error = sum( (G(i,s) - V_est(s)**2 )  for i in range(N))
+                            
+                            Error = sum( (y(i)-y_est(i))**2 for i in range(N) ) 
+            
+
+    With this error formulation we can do STOCHASTIC GRADIENT DESCENT
+                                         ---------------------------
+
+                    - Move in direction of gradient of error wrt only one sample at a time
+                    - Perfect for us since at every step of the game we have one sample to look at anyways
+
+
+   Gradient Descent
+   ----------------
+        theta = theta - alpha * dE/dtheta     
+                                
+                                * alpha: learning rate
+
+    This would work for every model not just linear.
+
+   Gradient Descent for linear models:
+   -----------------------------------
+       V_est(s, theta) = theta.T * phi(s) = theta.T * x
+
+        dV_est(s,theta)
+        _______________  =  x
+            dtheta 
+
+
+        theta = theta + alpha * (G - V_est(s, theta))*x
+
+
+  What we were doing before in previous classes were actually an instance of gradient descent.
+
+
+
+Feature Engineering
+-------------------
+
+Neural networks can in some sense find good nonlinear transformations/features of raw data
+But since we only study linear methods in this course -> we need to find features manually
+
+
+Mapping s -> x
+
+    States can be thought as categorical values ( (0,0) -> category 1, (0,1) -> category 2 etc. )
+
+    We can use one-hot encoding!
+               ----------------
+
+D = |S|         s = (0,0)  => x = [1,0,0,...]    
+                s = (0,1)  => x = [0,1,0,...]
+
+    Dimensionality is the size of |S|. Cardinality is the number of dimensions. For each state we set one of the 0's to 1.
+    
+    Problem is that it requires lots of space - does not compress it down. 
+    So we haven't made any improvement with one hot encoding over the original V(s) size problem.
+
+    On the other hand one-hot encoding can validate if a model is bad.
+
+Alternative to one-hot encoding:
+    
+    Gridworld -> each (i,j) represents a position in 2D space
+    More like 2 real numbers than a category
+    Vector x can be (i,j) itself
+    Mean should be 0 and var = 1.
+
+    Feature vector could actually be the RAW data itself!
+            (x1,x2) = (i,j)
+            
+                ||
+                \/
+
+BUT the problem with raw values is that the model is linear.
+In case of gridworld: for fixed j, V(i) is just a line on the plane.
+
+      || 
+      \/ solution
+
+Polynomials
+-----------
+From linear regression class: we can make new features by creating polynomials.
+From calculus: infinite Taylor expansion can approximate any function.
+
+Second order terms: x1**2, x2**2, x1*x2
+
+Careful not to overfit with higher order polynomials!
+
+
+
+Monte Carlo prediction with approximation
+-----------------------------------------
+
+- We will use MC for prediction first
+- Replace V(s) with linear model
+
+
+    2 main steps:
+        
+        1) Play game -> sequence of states, returns 
+        2) Update V(s) using return as the target and V(s) as the prediction == mean of all returns of all states, also gradient descent
+                
+                    V_est(s) = V_est(s) + alpha*(G(s) - V_est(s))
+                    
+                We want stochastic gradient descent in respect of theta.
+                    
+                    theta = theta + alpha*(G - V_est(s,theta)) * x
+
+-------------------------------------------------------------------
+pseudocode:
+"""
+For a fixed policy since we are doing a prediction problem.
+return g is the target.
+"""
+    def mc_approx_prediction(pi):
+        theta = random
+        for i in range(1,N):
+            states_and_returns = play_game
+            for s, g in states_and_returns:
+                x = phi(s)
+                theta = theta + alpha*(g - theta.T*x)*x
+
+
+code: approx_mc_prediction.py
+
+-------------------------------------------------------------------
+
+
+
+
+TD(0) with approximation
+------------------------
+
+
+Main diff between MC and TD is that with TD we do not use G. We use r + gamma*V(s') to estimate G.
+                                                                    ---------------
+
+        theta = theta + alpha*( r + gamma*V_est(s', theta) - V_est(s, theta) ) * ( dV_est(s,theta) / dtheta )
+        
+        theta = theta + alpha*(target - prediction) * (dprediction/dtheta)
+
+Problem: The issue is that the 'target'(r + gamma*V(s')) is not the real target just an estimate(prediction based on the model). 
+It still works well in practice so we do it anyway.
+
+We call it a semi-gradient method since the target we are using is not a real target -> gradient is not a true gradient!
+            semi-gradient
+            -------------
+
+With TD no need to calculate returns - use rewards directly!
+
+
+Code: approx_semigradient_td0_prediction.py  - only policy evaluation is going on here not optimization
+
+
+
+
+
+Semi-Gradient SARSA
+-------------------
+
+SARSA with approximation
+We will approximate Q. 
+More difficult then approximating V since instead of of approximating |S| values we need to approx |S|x|A| values.
+
+Prediction again appears in the target.
+
+Features:
+--------
+
+(s,a) -> x
+
+
+Simple idea: take our old encoding of s (row,col,row*col) and add one-hot encoding of actions
+x = (r,c,r*c, U, D, L, R, 1)
+
+The above is not expressive enough! Try to implement it!
+
+Instead we could have as features:
+    6 features per every 4 action: [r, c, r*r, c*c, r*c, 1] - U, [...] - D, [...] - L, [...] - R
+    + 1 extra bias = 25 features in total
+
+Tabular method in contrast has 9 states x 4 actions = 36 features
+
+
+Code: approx_semigradient_sarsa_control.py
+------------------------------------------
+    - Goal: find the optimal policy
+
+Semigradient method since the target is not a true target because it uses a model prediction.
+Gradient is not a true one so we call it semi-gradient.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
